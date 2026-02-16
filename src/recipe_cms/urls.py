@@ -3,14 +3,22 @@ from django.urls import include, path
 from django.contrib import admin
 
 from wagtail.admin import urls as wagtailadmin_urls
+from rest_framework import urls as rest_framework_urls
 from wagtail import urls as wagtail_urls
 from wagtail.documents import urls as wagtaildocs_urls
+from rest_framework.routers import DefaultRouter
+
+from home.views import HomeViewSet
 
 
+router = DefaultRouter()
+router.register("home", HomeViewSet, basename="home")
 urlpatterns = [
     path("django-admin/", admin.site.urls),
     path("admin/", include(wagtailadmin_urls)),
+    path("api/", include(router.urls)),
     path("documents/", include(wagtaildocs_urls)),
+    path("api-auth/", include(rest_framework_urls, namespace="rest_framework")),
 ]
 
 
