@@ -19,6 +19,7 @@ urlpatterns = [
     path("api/", include(router.urls)),
     path("documents/", include(wagtaildocs_urls)),
     path("api-auth/", include(rest_framework_urls, namespace="rest_framework")),
+    path("", include("social_django.urls", namespace="social")),
 ]
 
 

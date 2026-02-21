@@ -1,0 +1,5 @@
+{% extends "wagtailadmin/login.html" %}
+{% block branding_login %}Sign in to Frank's Site{% endblock %}
+{% block above_login %}
+<a href="{% url 'social:begin' 'auth0_openidconnect' %}">Login with Auth0</a>
+{% endblock %}

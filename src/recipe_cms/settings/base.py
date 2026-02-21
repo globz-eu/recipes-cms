@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
+import os
 from pathlib import Path
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
@@ -24,6 +25,7 @@ BASE_DIR = PROJECT_DIR.parent
 # Application definition
 
 INSTALLED_APPS = [
+    "login",
     "home",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
@@ -36,6 +38,7 @@ INSTALLED_APPS = [
     "wagtail.search",
     "wagtail.admin",
     "wagtail",
+    "social_django",
     "modelcluster",
     "taggit",
     "django_filters",
@@ -72,6 +75,8 @@ TEMPLATES = [
             "context_processors": [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
+                "social_django.context_processors.backends",
+                "social_django.context_processors.login_redirect",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
@@ -92,6 +97,10 @@ DATABASES = {
     }
 }
 
+AUTHENTICATION_BACKENDS = [
+    "social_core.backends.auth0_openidconnect.Auth0OpenIdConnectAuth",
+    "django.contrib.auth.backends.ModelBackend",
+]
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -111,7 +120,14 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
+SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN = os.getenv(
+    "SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN"
+)
+SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY = os.getenv("SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY")
+SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET = os.getenv(
+    "SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET"
+)
+SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SCOPE = ["openid", "profile", "email", "offline_access"]
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
@@ -188,3 +204,7 @@ WAGTAILDOCS_EXTENSIONS = [
     "xlsx",
     "zip",
 ]
+
+LOGIN_URL = "/login/"
+LOGIN_REDIRECT_URL = "/admin/"
+LOGOUT_REDIRECT_URL = "/"

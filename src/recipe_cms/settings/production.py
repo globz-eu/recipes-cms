@@ -1,4 +1,4 @@
-from .base import *
+from .base import *  # noqa: F403
 
 DEBUG = False
 
@@ -6,9 +6,8 @@ DEBUG = False
 # outdated JavaScript / CSS assets being served from cache
 # (e.g. after a Wagtail upgrade).
 # See https://docs.djangoproject.com/en/6.0/ref/contrib/staticfiles/#manifeststaticfilesstorage
-STORAGES["staticfiles"]["BACKEND"] = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+STORAGES["staticfiles"]["BACKEND"] = (  # noqa: F405
+    "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+)
 
-try:
-    from .local import *
-except ImportError:
-    pass
+SOCIAL_AUTH_JSONFIELD_ENABLED = True
