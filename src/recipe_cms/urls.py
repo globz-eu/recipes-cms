@@ -9,13 +9,17 @@ from wagtail.documents import urls as wagtaildocs_urls
 from rest_framework.routers import DefaultRouter
 
 from home.views import HomeViewSet
+from login.views import CustomLogoutView
 
 
 router = DefaultRouter()
 router.register("home", HomeViewSet, basename="home")
 urlpatterns = [
     path("django-admin/", admin.site.urls),
+    # Override Wagtail admin logout before including wagtailadmin_urls
+    path("admin/logout/", CustomLogoutView.as_view(), name="wagtailadmin_logout"),
     path("admin/", include(wagtailadmin_urls)),
+    path("", include("login.urls", namespace="login")),
     path("api/", include(router.urls)),
     path("documents/", include(wagtaildocs_urls)),
     path("api-auth/", include(rest_framework_urls, namespace="rest_framework")),
