@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 import os
 from pathlib import Path
+from tkinter import W
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = PROJECT_DIR.parent
@@ -175,6 +176,7 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10_000
 # Wagtail settings
 
 WAGTAIL_SITE_NAME = "recipe_cms"
+WAGTAIL_ADMIN_BASE_PATH = "admin"
 
 # Search
 # https://docs.wagtail.org/en/stable/topics/search/backends.html
@@ -205,10 +207,8 @@ WAGTAILDOCS_EXTENSIONS = [
     "zip",
 ]
 
-LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/admin/"
-LOGOUT_REDIRECT_URL = "/"
-WAGTAIL_FRONTEND_LOGIN_URL = "/login/"
+LOGOUT_REDIRECT_URL = "/admin/"
 
 # Logging configuration
 LOGGING = {

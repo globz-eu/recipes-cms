@@ -15,9 +15,8 @@ class CustomLogoutView(View):
     """
 
     def get(self, request):
-        logger.info(
-            "CustomLogoutView GET: Initiating logout for user: %s", request.user
-        )
+        logger.info(f"CustomLogoutView GET: Initiating logout for user: {request.user}")
+
         # Check if user is authenticated via social_auth
         if request.user.is_authenticated:
             try:
@@ -32,38 +31,38 @@ class CustomLogoutView(View):
                     # Perform Django logout first
                     logout(request)
 
-                    # Build Auth0 logout URL
-                    auth0_domain = getattr(
-                        settings, "SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN", None
-                    )
-                    if auth0_domain:
-                        # Get the return URL (where to redirect after Auth0 logout)
-                        return_to = request.build_absolute_uri("/admin/logout/")
+                    try:
+                        auth0_domain = settings.SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN
+                        logout_redirect_url = settings.LOGOUT_REDIRECT_URL
+                    except AttributeError:
+                        raise Exception(
+                            "Auth0 settings not configured properly. Please set SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN and LOGOUT_REDIRECT_URL in your settings."
+                        )
 
-                        # Auth0 logout endpoint
-                        logout_url = f"https://{auth0_domain}/oidc/logout?"
-                        params = {
-                            "post_logout_redirect_uri": return_to,
-                            "client_id": getattr(
-                                settings, "SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY", ""
-                            ),
-                        }
-                        logout_url += urlencode(params)
-                        logger.info("Redirecting to Auth0 logout: %s", logout_url)
-                        return redirect(logout_url)
-                    else:
-                        logger.warning("Auth0 domain not configured")
+                    # Get the return URL (where to redirect after Auth0 logout)
+                    return_to = request.build_absolute_uri(logout_redirect_url)
+
+                    # Auth0 logout endpoint
+                    logout_url = f"https://{auth0_domain}/oidc/logout?"
+                    params = {
+                        "post_logout_redirect_uri": return_to,
+                        "client_id": getattr(
+                            settings, "SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY", ""
+                        ),
+                    }
+                    logout_url += urlencode(params)
+                    logger.info(f"Redirecting to Auth0 logout: {logout_url}")
+                    return redirect(logout_url)
+
             except Exception as e:
                 # If there's any issue with social auth, fall through to regular logout
-                logger.exception("Error during social auth logout: %s", e)
+                logger.exception(f"Error during social auth logout: {e}")
 
         # Regular logout for non-social auth users
         logger.info("Performing regular logout")
         logout(request)
-        return redirect("/admin/")
+        return redirect(f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
 
     def post(self, request):
-        logger.info(
-            "CustomLogoutView POST: request received for user: %s", request.user
-        )
+        logger.info(f"CustomLogoutView POST: request received for user: {request.user}")
         return self.get(request)
