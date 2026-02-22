@@ -19,7 +19,6 @@ urlpatterns = [
     # Override Wagtail admin logout before including wagtailadmin_urls
     path("admin/logout/", CustomLogoutView.as_view(), name="wagtailadmin_logout"),
     path("admin/", include(wagtailadmin_urls)),
-    path("", include("login.urls", namespace="login")),
     path("api/", include(router.urls)),
     path("documents/", include(wagtaildocs_urls)),
     path("api-auth/", include(rest_framework_urls, namespace="rest_framework")),
