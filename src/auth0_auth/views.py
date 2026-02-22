@@ -2,7 +2,7 @@ from django.shortcuts import redirect
 from django.contrib.auth import logout
 from django.views import View
 from django.conf import settings
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlunparse
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,14 +33,22 @@ class CustomLogoutView(View):
                             "Auth0 settings not configured properly. Please set SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN and LOGOUT_REDIRECT_URL in your settings."
                         )
                     return_to = request.build_absolute_uri(logout_redirect_url)
-                    logout_url = f"https://{auth0_domain}/oidc/logout?"
                     params = {
                         "post_logout_redirect_uri": return_to,
                         "client_id": getattr(
                             settings, "SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY", ""
                         ),
                     }
-                    logout_url += urlencode(params)
+                    logout_url = urlunparse(
+                        (
+                            "https",
+                            auth0_domain,
+                            "/oidc/logout",
+                            "",
+                            urlencode(params),
+                            "",
+                        )
+                    )
                     logger.info("Logging out user from Django session")
                     logout(request)
                     logger.info(f"Redirecting to Auth0 logout: {logout_url}")
