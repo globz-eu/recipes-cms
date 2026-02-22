@@ -9,7 +9,7 @@ from wagtail.documents import urls as wagtaildocs_urls
 from rest_framework.routers import DefaultRouter
 
 from home.views import HomeViewSet
-from login.views import CustomLogoutView
+from auth0_auth.views import CustomLogoutView
 
 
 router = DefaultRouter()

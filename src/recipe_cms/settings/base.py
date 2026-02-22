@@ -26,7 +26,7 @@ BASE_DIR = PROJECT_DIR.parent
 # Application definition
 
 INSTALLED_APPS = [
-    "login",
+    "auth0_auth",
     "home",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
