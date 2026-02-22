@@ -2,6 +2,7 @@ from django.shortcuts import redirect
 from django.contrib.auth import logout
 from django.views import View
 from django.conf import settings
+from django.http import HttpRequest, HttpResponse
 from urllib.parse import urlencode, urlunparse
 import logging
 
@@ -14,11 +15,12 @@ class CustomLogoutView(View):
     For Auth0, redirects to Auth0's logout endpoint with return_to parameter.
     """
 
-    def get(self, request):
+    def get(self, request: HttpRequest) -> HttpResponse:
         logger.info(f"CustomLogoutView GET: Initiating logout for user: {request.user}")
         if request.user.is_authenticated:
             try:
-                social = request.user.social_auth.first()
+                social_auth = getattr(request.user, "social_auth", None)
+                social = social_auth.first() if social_auth else None
                 logger.info(
                     "Social auth found: %s, provider: %s",
                     social,
@@ -67,6 +69,6 @@ class CustomLogoutView(View):
             logger.info("No authenticated user found, redirecting to admin login")
             return redirect(f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
 
-    def post(self, request):
+    def post(self, request: HttpRequest) -> HttpResponse:
         logger.info(f"CustomLogoutView POST: request received for user: {request.user}")
         return self.get(request)

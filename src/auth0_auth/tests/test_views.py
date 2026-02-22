@@ -19,7 +19,9 @@ class CustomLogoutViewTestCase(TestCase):
 
     def _add_session_to_request(self, request):
         """Add session to request for logout to work properly."""
-        middleware = SessionMiddleware(lambda x: None)
+        from django.http import HttpResponse
+
+        middleware = SessionMiddleware(lambda x: HttpResponse())
         middleware.process_request(request)
         request.session.save()
         return request
@@ -35,7 +37,7 @@ class CustomLogoutViewTestCase(TestCase):
 
         mock_logout.assert_called_once()
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
+        self.assertEqual(response["Location"], f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
 
     @patch("auth0_auth.views.logout")
     def test_regular_logout_post_request(self, mock_logout):
@@ -48,7 +50,7 @@ class CustomLogoutViewTestCase(TestCase):
 
         mock_logout.assert_called_once()
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
+        self.assertEqual(response["Location"], f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
 
     @patch("auth0_auth.views.logout")
     def test_anonymous_user_logout(self, mock_logout):
@@ -61,7 +63,7 @@ class CustomLogoutViewTestCase(TestCase):
 
         mock_logout.assert_not_called()
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
+        self.assertEqual(response["Location"], f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
 
     @override_settings(
         SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN="test-domain.auth0.com",
@@ -89,9 +91,9 @@ class CustomLogoutViewTestCase(TestCase):
 
         mock_logout.assert_called_once()
         self.assertEqual(response.status_code, 302)
-        self.assertIn("test-domain.auth0.com/oidc/logout", response.url)
-        self.assertIn("post_logout_redirect_uri=", response.url)
-        self.assertIn("client_id=test-client-id", response.url)
+        self.assertIn("test-domain.auth0.com/oidc/logout", response["Location"])
+        self.assertIn("post_logout_redirect_uri=", response["Location"])
+        self.assertIn("client_id=test-client-id", response["Location"])
 
     @override_settings(
         SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN="test-domain.auth0.com",
@@ -118,7 +120,7 @@ class CustomLogoutViewTestCase(TestCase):
 
         mock_logout.assert_called_once()
         self.assertEqual(response.status_code, 302)
-        self.assertIn("test-domain.auth0.com/oidc/logout", response.url)
+        self.assertIn("test-domain.auth0.com/oidc/logout", response["Location"])
 
     @override_settings(
         SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN=None,
@@ -146,7 +148,7 @@ class CustomLogoutViewTestCase(TestCase):
 
         mock_logout.assert_called_once()
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
+        self.assertEqual(response["Location"], f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
 
     @patch("auth0_auth.views.logout")
     def test_social_auth_with_different_provider(self, mock_logout):
@@ -170,7 +172,7 @@ class CustomLogoutViewTestCase(TestCase):
         # Should fall back to regular logout
         mock_logout.assert_called_once()
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
+        self.assertEqual(response["Location"], f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
 
     @patch("auth0_auth.views.logout")
     def test_social_auth_exception_handling(self, mock_logout):
@@ -191,7 +193,7 @@ class CustomLogoutViewTestCase(TestCase):
         # Should fall back to regular logout despite exception
         mock_logout.assert_called_once()
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
+        self.assertEqual(response["Location"], f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
 
     @patch("auth0_auth.views.logout")
     def test_no_social_auth_attribute(self, mock_logout):
@@ -205,4 +207,4 @@ class CustomLogoutViewTestCase(TestCase):
 
         mock_logout.assert_called_once()
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
+        self.assertEqual(response["Location"], f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
