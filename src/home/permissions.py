@@ -6,7 +6,7 @@ class IsEditorOrAdmin(permissions.BasePermission):
     Custom permission to only allow users who are in the Editors group or are admins.
     """
 
-    def has_permission(self, request, view):
+    def has_permission(self, request, view) -> bool:  # type: ignore[override]
         # User must be authenticated
         if (
             not hasattr(request, "user")
