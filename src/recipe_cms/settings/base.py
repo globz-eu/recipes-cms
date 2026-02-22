@@ -267,7 +267,7 @@ LOGGING = {
         },
     },
     "loggers": {
-        "login": {
+        "auth0_auth": {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
