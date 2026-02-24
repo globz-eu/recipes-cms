@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
+    "psycopg2-binary>=2.9.10",
     "social-auth-app-django>=5.4.3",
     "wagtail>=7.1.3",
 ]
