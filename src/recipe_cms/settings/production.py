@@ -29,3 +29,5 @@ STORAGES["staticfiles"]["BACKEND"] = (  # noqa: F405
 )
 
 SOCIAL_AUTH_JSONFIELD_ENABLED = True
+
+BASE_PATH = os.getenv("BASE_PATH", "/")
