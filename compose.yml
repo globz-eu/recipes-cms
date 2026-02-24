@@ -1,0 +1,105 @@
+services:
+  nginx:
+    image: nginx:1.29-alpine
+    develop:
+      watch:
+        - action: restart
+          path: config/nginx/nginx.conf
+    ports:
+      - target: 8080
+        published: 8080
+        protocol: tcp
+    volumes:
+      - source: config/nginx/nginx.conf
+        target: /etc/nginx/nginx.conf
+        type: bind
+      - source: wagtail-static
+        target: /usr/share/nginx/html/static
+        type: volume
+      - source: wagtail-media
+        target: /usr/share/nginx/html/media
+        type: volume
+      - source: frontend
+        target: /usr/share/nginx/html
+        type: bind
+    depends_on:
+      wagtail:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      start_interval: 2s
+      start_period: 10s
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  wagtail:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DJANGO_SETTINGS_MODULE: "recipes_cms.settings.dev"
+    develop:
+      watch:
+        - action: sync
+          path: src
+          target: /app
+          initial_sync: true
+    command: ["uv", "run", "manage.py", "runserver", "0.0.0.0:8000"]
+    ports:
+      - target: 8000
+        published: 8000
+        protocol: tcp
+    environment:
+      SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN:
+      SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY:
+      SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET:
+      POSTGRES_USER:
+      POSTGRES_PASSWORD:
+      POSTGRES_DB:
+      POSTGRES_HOST:
+      SECRET_KEY:
+      BASE_PATH: /
+    volumes:
+      - source: wagtail-static
+        target: /app/static
+        type: volume
+      - source: wagtail-media
+        target: /app/media
+        type: volume
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      start_interval: 2s
+      start_period: 20s
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  database:
+    image: postgres:18
+    ports:
+      - target: 5432
+        published: 5432
+        protocol: tcp
+    environment:
+      POSTGRES_USER:
+      POSTGRES_PASSWORD:
+      POSTGRES_DB:
+    volumes:
+      - source: wagtail-db-data
+        target: /var/lib/postgresql
+        type: volume
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      start_interval: 5s
+      start_period: 10s
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  wagtail-db-data:
+  wagtail-static:
+  wagtail-media:
