@@ -1,16 +1,14 @@
 from django.conf import settings
-from django.urls import include, path
 from django.contrib import admin
-
-from wagtail.admin import urls as wagtailadmin_urls
+from django.urls import include, path
 from rest_framework import urls as rest_framework_urls
-from wagtail import urls as wagtail_urls
-from wagtail.documents import urls as wagtaildocs_urls
 from rest_framework.routers import DefaultRouter
+from wagtail import urls as wagtail_urls
+from wagtail.admin import urls as wagtailadmin_urls
+from wagtail.documents import urls as wagtaildocs_urls
 
-from home.views import HomeViewSet
 from auth0_auth.views import CustomLogoutView
-
+from home.views import HomeViewSet
 
 router = DefaultRouter()
 router.register("home", HomeViewSet, basename="home")

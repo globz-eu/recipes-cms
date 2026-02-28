@@ -68,23 +68,89 @@ src/
 
 ## Development
 
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/) (included with Docker Desktop)
+
+### Environment Variables
+
+Create a `.env` file in the project root with the following variables:
+
+```bash
+SECRET_KEY=your-django-secret-key
+
+# Auth0
+SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN=your-domain.auth0.com
+SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY=your-client-id
+SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET=your-client-secret
+
+# PostgreSQL
+POSTGRES_USER=recipes
+POSTGRES_PASSWORD=recipes
+POSTGRES_DB=recipes
+POSTGRES_HOST=database
+```
+
+### Starting the Stack
+
+```bash
+docker compose up
+```
+
+This starts three services:
+
+| Service    | Description                  | Port  |
+|------------|------------------------------|-------|
+| `wagtail`  | Django/Wagtail app server    | 8000  |
+| `nginx`    | Reverse proxy / static files | 8080  |
+| `database` | PostgreSQL 18                | 5432  |
+
+The admin interface is available at http://localhost:8080/admin/.
+
+### Live Reload (file sync)
+
+Use Docker Compose Watch to automatically sync local source changes into the container:
+
+```bash
+docker compose watch
+```
+
+Changes to `src/` are synced into the running container without requiring a restart. Changes to `config/nginx/nginx.conf` trigger an nginx restart.
+
+### Running Management Commands
+
+```bash
+# Open a shell inside the wagtail container
+docker compose exec wagtail /bin/bash
+
+# Or run a command directly
+docker compose exec wagtail uv run manage.py migrate
+docker compose exec wagtail uv run manage.py createsuperuser
+docker compose exec wagtail uv run manage.py collectstatic
+```
+
 ### Running Tests
 
 ```bash
 # Run all tests
-uv run src/manage.py test
+docker compose exec wagtail uv run manage.py test
 
 # Run auth0_auth tests
-uv run src/manage.py test auth0_auth
+docker compose exec wagtail uv run manage.py test auth0_auth
 
 # Run home tests
-uv run src/manage.py test home
+docker compose exec wagtail uv run manage.py test home
 ```
 
-### Running the Development Server
+### Stopping the Stack
 
 ```bash
-uv run src/manage.py runserver
+# Stop containers
+docker compose down
+
+# Stop and remove volumes (resets database and static files)
+docker compose down -v
 ```
 
 ## Authentication Flow

@@ -32,7 +32,6 @@ COPY --chown=wagtail:wagtail uv.lock .
 COPY --chown=wagtail:wagtail .python-version .
 
 RUN mkdir recipe_cms/static
-RUN mkdir /home/wagtail/.mc
 RUN uv sync --locked --compile-bytecode
 RUN uv run manage.py collectstatic --noinput --clear
 

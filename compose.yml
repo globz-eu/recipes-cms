@@ -38,7 +38,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        DJANGO_SETTINGS_MODULE: "recipes_cms.settings.dev"
+        DJANGO_SETTINGS_MODULE: "recipe_cms.settings.dev"
     develop:
       watch:
         - action: sync
