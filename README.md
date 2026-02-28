@@ -143,6 +143,27 @@ docker compose exec wagtail uv run manage.py test auth0_auth
 docker compose exec wagtail uv run manage.py test home
 ```
 
+### Invoke Tasks
+
+Common development tasks are automated with [Invoke](https://www.pyinvoke.org/). Run `uv run invoke -l` to list all available tasks.
+
+| Task | Description |
+|------|-------------|
+| `invoke dev` | Start the development server via Docker Compose with file watching enabled (`--build` flag rebuilds images first) |
+| `invoke format` | Format and auto-fix source code using `ruff` |
+| `invoke bump` | Bump the project version, update the lockfile, and create an annotated git tag (`--part major\|minor\|patch`, default: `patch`) |
+
+```bash
+# Start dev server (rebuild images first)
+uv run invoke dev --build
+
+# Format code
+uv run invoke format
+
+# Bump the minor version
+uv run invoke bump --part minor
+```
+
 ### Stopping the Stack
 
 ```bash
