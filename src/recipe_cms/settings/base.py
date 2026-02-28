@@ -26,6 +26,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 # Application definition
 
 INSTALLED_APPS = [
+    "image_auth",
     "auth0_auth",
     "home",
     "wagtail.contrib.forms",

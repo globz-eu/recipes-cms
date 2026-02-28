@@ -9,6 +9,7 @@ from wagtail.documents import urls as wagtaildocs_urls
 
 from auth0_auth.views import CustomLogoutView
 from home.views import HomeViewSet
+from image_auth import urls as image_auth_urls
 
 router = DefaultRouter()
 router.register("home", HomeViewSet, basename="home")
@@ -18,6 +19,7 @@ urlpatterns = [
     path("admin/logout/", CustomLogoutView.as_view(), name="wagtailadmin_logout"),
     path("admin/", include(wagtailadmin_urls)),
     path("api/", include(router.urls)),
+    path("image-auth/", include(image_auth_urls)),
     path("documents/", include(wagtaildocs_urls)),
     path("api-auth/", include(rest_framework_urls, namespace="rest_framework")),
     path("", include("social_django.urls", namespace="social")),
