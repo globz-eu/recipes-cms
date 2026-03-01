@@ -16,9 +16,6 @@ services:
       - source: wagtail-static
         target: /usr/share/nginx/html/static
         type: volume
-      - source: wagtail-media
-        target: /usr/share/nginx/html/media
-        type: volume
       - source: frontend
         target: /usr/share/nginx/html
         type: bind
@@ -71,9 +68,6 @@ services:
     volumes:
       - source: wagtail-static
         target: /app/static
-        type: volume
-      - source: wagtail-media
-        target: /app/media
         type: volume
     depends_on:
       database:
@@ -140,6 +134,5 @@ services:
 volumes:
   wagtail-db-data:
   wagtail-static:
-  wagtail-media:
   garage-meta:
   garage-data:
