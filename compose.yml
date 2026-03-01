@@ -2,11 +2,9 @@ services:
   nginx:
     image: nginx:1.29-alpine
     develop:
-      # watch:
-      #   - action: restart
-      #     path: config/nginx/nginx.conf
-      #     target: /etc/nginx/nginx.conf
-      #     initial_sync: true
+      watch:
+        - action: restart
+          path: config/nginx/nginx.conf
     ports:
       - target: 8080
         published: 8080

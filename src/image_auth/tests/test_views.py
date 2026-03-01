@@ -2,7 +2,6 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -10,13 +9,12 @@ from image_auth.views import get_image_file, get_image_type
 
 User = get_user_model()
 
-IMAGE_AUTH_URL = "/image-auth/"
+IMAGE_AUTH_URL = "/api/image-auth/"
 RENDITION_URI = "/media/images/test.jpg"
 ORIGINAL_URI = "/media/original_images/test.jpg"
 INVALID_URI = "/media/other/test.jpg"
 
 
-@override_settings(MEDIA_URL="/media/")
 class CheckPermissionsViewTests(APITestCase):
     """Tests for the check_permissions view."""
 
@@ -45,31 +43,31 @@ class CheckPermissionsViewTests(APITestCase):
     # Header validation
     # ------------------------------------------------------------------
 
-    def test_missing_x_original_uri_returns_400(self):
-        """Request without X-Original-Uri header returns 400."""
+    def test_missing_x_original_uri_returns_403(self):
+        """Request without X-Original-Uri header returns 403."""
         self.client.login(username="superuser", password="testpass123")
         response = self.client.get(IMAGE_AUTH_URL)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json()["message"], "Bad Request")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.json()["message"], "Forbidden")
 
-    def test_invalid_image_path_returns_400(self):
-        """URI whose path doesn't start with images/ or original_images/ returns 400."""
+    def test_invalid_image_path_returns_403(self):
+        """URI whose path doesn't start with images/ or original_images/ returns 403."""
         self.client.login(username="superuser", password="testpass123")
         response = self.client.get(IMAGE_AUTH_URL, HTTP_X_ORIGINAL_URI=INVALID_URI)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json()["message"], "Bad Request")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.json()["message"], "Forbidden")
 
     # ------------------------------------------------------------------
     # Image not found in DB
     # ------------------------------------------------------------------
 
     @patch("image_auth.views.get_db_image", return_value=False)
-    def test_image_not_found_returns_404(self, _mock):
-        """When image does not exist in DB, returns 404."""
+    def test_image_not_found_returns_403(self, _mock):
+        """When image does not exist in DB, returns 403."""
         self.client.login(username="superuser", password="testpass123")
         response = self.client.get(IMAGE_AUTH_URL, HTTP_X_ORIGINAL_URI=RENDITION_URI)
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.json()["message"], "Not found")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.json()["message"], "Forbidden")
 
     # ------------------------------------------------------------------
     # Authorization checks (image exists in DB)
@@ -126,11 +124,10 @@ class CheckPermissionsViewTests(APITestCase):
     # ------------------------------------------------------------------
 
 
-@override_settings(MEDIA_URL="/media/")
 class GetImageFileTests(APITestCase):
     """Unit tests for the get_image_file helper."""
 
-    def test_strips_media_url_prefix(self):
+    def test_strips_media_prefix(self):
         result = get_image_file("/media/images/photo.jpg")
         self.assertEqual(result, "images/photo.jpg")
 
