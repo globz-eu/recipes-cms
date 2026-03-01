@@ -29,6 +29,9 @@ INSTALLED_APPS = [
     "image_auth",
     "auth0_auth",
     "home",
+    "storages",
+    "wagtail_storages",
+    "django.contrib.postgres",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
     "wagtail.embeds",
@@ -50,7 +53,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django.contrib.postgres",
     "rest_framework",
 ]
 
@@ -204,16 +206,53 @@ STATIC_URL = "/static/"
 MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_URL = "/media/"
 
+# S3 / Garage storage
+S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
+S3_ACCESS_KEY = os.environ.get("S3_ACCESS_KEY")
+S3_SECRET_KEY = os.environ.get("S3_SECRET_KEY")
+S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL")
+
+if S3_BUCKET_NAME:
+    AWS_STORAGE_BUCKET_NAME = S3_BUCKET_NAME
+    AWS_ACCESS_KEY_ID = S3_ACCESS_KEY
+    AWS_SECRET_ACCESS_KEY = S3_SECRET_KEY
+    AWS_S3_ENDPOINT_URL = S3_ENDPOINT_URL
+    AWS_S3_REGION_NAME = os.environ.get("S3_REGION_NAME", "garage")
+    # Path-style addressing required for non-AWS S3-compatible storage (Garage)
+    AWS_S3_ADDRESSING_STYLE = "path"
+    AWS_S3_SIGNATURE_VERSION = "s3v4"
+    # Don't sign URLs – objects are served publicly via bucket policy
+    AWS_QUERYSTRING_AUTH = False
+    # Don't overwrite files on upload (Wagtail recommendation)
+    AWS_S3_FILE_OVERWRITE = False
+    # Default ACL: private; wagtail-storages manages per-object ACLs for documents
+    AWS_DEFAULT_ACL = "private"
+    # Custom domain routes public media URLs through the nginx reverse proxy.
+    # Format: "hostname/media" so django-storages builds http(s)://hostname/media/<key>
+    if os.environ.get("S3_CUSTOM_DOMAIN"):
+        AWS_S3_CUSTOM_DOMAIN = os.environ["S3_CUSTOM_DOMAIN"]
+    AWS_S3_URL_PROTOCOL = os.environ.get("S3_URL_PROTOCOL", "https:")
+
 # Default storage settings
 # See https://docs.djangoproject.com/en/6.0/ref/settings/#std-setting-STORAGES
-STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-    },
-}
+if S3_BUCKET_NAME:
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+else:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
 
 # Django sets a maximum of 1000 fields per form by default, but particularly complex page models
 # can exceed this limit within Wagtail's page editor.

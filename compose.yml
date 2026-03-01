@@ -2,9 +2,11 @@ services:
   nginx:
     image: nginx:1.29-alpine
     develop:
-      watch:
-        - action: restart
-          path: config/nginx/nginx.conf
+      # watch:
+      #   - action: restart
+      #     path: config/nginx/nginx.conf
+      #     target: /etc/nginx/nginx.conf
+      #     initial_sync: true
     ports:
       - target: 8080
         published: 8080
@@ -25,6 +27,8 @@ services:
     depends_on:
       wagtail:
         condition: service_healthy
+      s3:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/health"]
       start_interval: 2s
@@ -60,6 +64,12 @@ services:
       POSTGRES_HOST:
       SECRET_KEY:
       BASE_PATH: /
+      S3_BUCKET_NAME:
+      S3_ACCESS_KEY:
+      S3_SECRET_KEY:
+      S3_ENDPOINT_URL: http://s3:3900
+      S3_CUSTOM_DOMAIN:
+      S3_URL_PROTOCOL:
     volumes:
       - source: wagtail-static
         target: /app/static
@@ -99,7 +109,39 @@ services:
       timeout: 10s
       retries: 5
 
+  s3:
+    image: dxflrs/garage:v2.2.0
+    ports:
+      - target: 3900
+        published: 3900
+        protocol: tcp
+      - target: 3901
+        published: 3901
+        protocol: tcp
+      - target: 3902
+        published: 3902
+        protocol: tcp
+      - target: 3903
+        published: 3903
+        protocol: tcp
+    volumes:
+      - source: config/garage/garage.toml
+        target: /etc/garage.toml
+        type: bind
+      - source: garage-meta
+        target: /var/lib/garage/meta
+        type: volume
+      - source: garage-data
+        target: /var/lib/garage/data
+        type: volume
+    environment:
+      GARAGE_ADMIN_TOKEN:
+      GARAGE_METRICS_TOKEN:
+      GARAGE_RPC_SECRET:
+
 volumes:
   wagtail-db-data:
   wagtail-static:
   wagtail-media:
+  garage-meta:
+  garage-data:

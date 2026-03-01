@@ -35,9 +35,10 @@ SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET=your-client-secret
 ## Tech Stack
 
 - **Django 6.x**: Web framework
-- **Wagtail 7.3rc1**: CMS framework
+- **Wagtail 7.3**: CMS framework
 - **Django REST Framework**: API development
 - **Social Auth App Django**: OAuth/OpenID Connect integration
+- **django-storages + wagtail-storages**: S3-compatible media storage via Garage
 - **Python 3.14+**: Programming language
 
 ## Project Structure
@@ -90,7 +91,20 @@ POSTGRES_USER=recipes
 POSTGRES_PASSWORD=recipes
 POSTGRES_DB=recipes
 POSTGRES_HOST=database
+
+# Garage S3-compatible object storage
+GARAGE_ADMIN_TOKEN=your-garage-admin-token
+GARAGE_METRICS_TOKEN=your-garage-metrics-token
+GARAGE_RPC_SECRET=your-garage-rpc-secret
+S3_BUCKET_NAME=recipes-cms
+S3_ACCESS_KEY=your-garage-access-key
+S3_SECRET_KEY=your-garage-secret-key
+S3_ENDPOINT_URL=http://s3:3900
+S3_CUSTOM_DOMAIN=localhost:8080/media
+S3_URL_PROTOCOL=http:
 ```
+
+Copy `.env.example` to `.env` and fill in the values.
 
 ### Starting the Stack
 
@@ -105,6 +119,7 @@ This starts three services:
 | `wagtail`  | Django/Wagtail app server    | 8000  |
 | `nginx`    | Reverse proxy / static files | 8080  |
 | `database` | PostgreSQL 18                | 5432  |
+| `s3`       | Garage S3-compatible storage | 3900 (S3 API), 3902 (web), 3903 (admin) |
 
 The admin interface is available at http://localhost:8080/admin/.
 
@@ -172,6 +187,59 @@ docker compose down
 
 # Stop and remove volumes (resets database and static files)
 docker compose down -v
+```
+
+### Object Storage (Garage)
+
+Media files (images, documents) are stored in [Garage](https://garagehq.deuxfleurs.fr/), a self-hosted S3-compatible object store.
+
+#### How it works
+
+- The `wagtail` container uploads files directly to Garage on port 3900 (S3 API) using `django-storages` with the `S3Boto3Storage` backend.
+- Browsers fetch media via nginx at `/media/`, which proxies to Garage's web endpoint (port 3902). This avoids exposing Garage directly and keeps the public URL stable.
+- `wagtail-storages` manages per-object ACLs so documents in private Wagtail collections are not publicly accessible.
+
+#### S3_CUSTOM_DOMAIN
+
+`S3_CUSTOM_DOMAIN` controls the base URL that Django generates for uploaded files. Set it to the public hostname and path prefix that nginx uses to serve media:
+
+```bash
+# Local dev (nginx on :8080, proxying /media/ to Garage)
+S3_CUSTOM_DOMAIN=localhost:8080/media
+S3_URL_PROTOCOL=http:
+
+# Production
+S3_CUSTOM_DOMAIN=your-domain.com/media
+S3_URL_PROTOCOL=https:
+```
+
+#### Provisioning Garage for a new environment
+
+```bash
+# 1. Start the stack
+docker compose up -d
+
+# 2. Apply layout (single-node cluster)
+docker compose exec s3 /garage layout assign -z dc1 -c 1G $(docker compose exec s3 /garage node id -q | head -c 16)
+docker compose exec s3 /garage layout apply --version 1
+
+# 3. Create bucket and access key
+docker compose exec s3 /garage bucket create recipes-cms
+docker compose exec s3 /garage key create recipes-cms-key
+docker compose exec s3 /garage bucket allow --read --write --owner recipes-cms --key recipes-cms-key
+
+# 4. Enable website mode (required for public /media/ access via nginx)
+docker compose exec s3 /garage bucket website --allow recipes-cms
+
+# 5. Copy the printed key ID / secret into your .env as S3_ACCESS_KEY / S3_SECRET_KEY
+```
+
+#### Fix document ACLs
+
+If documents were uploaded before `wagtail-storages` was active, run:
+
+```bash
+docker compose exec wagtail uv run manage.py fix_document_acls
 ```
 
 ## Authentication Flow
