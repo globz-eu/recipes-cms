@@ -15,7 +15,7 @@ from wagtail.images.models import Image
 from home.permissions import IsEditorOrAdmin
 
 _MEDIA_PREFIX = "/media/"
-_S3_CHUNK_SIZE = 1024 * 1024  # 1 MB
+_S3_CHUNK_SIZE = 1024 * 1024  # 1 MiB
 
 
 @functools.lru_cache(maxsize=1)
