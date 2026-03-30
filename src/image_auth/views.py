@@ -85,8 +85,8 @@ def serve_media(request: Request, image_path: str) -> StreamingHttpResponse:
     the private S3 bucket via boto3 (credentials from settings) and
     streams it back in chunks, preserving the Content-Type returned by S3.
 
-    - **200 OK** – object found and streamed.
-    - **404 Not Found** – no such key in the bucket.
+    - **200 OK** - object found and streamed.
+    - **404 Not Found** - no such key in the bucket.
     """
     s3_client = _get_s3_client()
     try:
