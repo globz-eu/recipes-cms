@@ -1,5 +1,10 @@
 import re
 
+import boto3
+from botocore.config import Config
+from botocore.exceptions import ClientError
+from django.conf import settings
+from django.http import Http404, StreamingHttpResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -9,6 +14,21 @@ from wagtail.images.models import Image
 from home.permissions import IsEditorOrAdmin
 
 _MEDIA_PREFIX = "/media/"
+_S3_CHUNK_SIZE = 1024 * 1024  # 1 MB
+
+
+def _get_s3_client():
+    return boto3.client(
+        "s3",
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        endpoint_url=settings.AWS_S3_ENDPOINT_URL,
+        region_name=settings.AWS_S3_REGION_NAME,
+        config=Config(
+            signature_version=settings.AWS_S3_SIGNATURE_VERSION,
+            s3={"addressing_style": settings.AWS_S3_ADDRESSING_STYLE},
+        ),
+    )
 
 
 @api_view(["GET"])
@@ -51,6 +71,42 @@ def check_permissions(request: Request) -> Response:
 
     except Exception as e:
         return Response(data={"message": str(e)}, status=400)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def serve_media(request: Request, image_path: str) -> StreamingHttpResponse:
+    """
+    Stream a private S3 object to the client.
+
+    This view is reached only after nginx has already performed the
+    ``auth_request /image-auth/`` gate check, so no additional permission
+    check is performed here.  The view fetches the object directly from
+    the private S3 bucket via boto3 (credentials from settings) and
+    streams it back in chunks, preserving the Content-Type returned by S3.
+
+    - **200 OK** – object found and streamed.
+    - **404 Not Found** – no such key in the bucket.
+    """
+    s3_client = _get_s3_client()
+    try:
+        obj = s3_client.get_object(
+            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+            Key=image_path,
+        )
+    except ClientError as exc:
+        if exc.response["Error"]["Code"] in ("NoSuchKey", "404"):
+            raise Http404
+        raise
+
+    content_type = obj.get("ContentType", "application/octet-stream")
+
+    def _iter_body():
+        body = obj["Body"]
+        while chunk := body.read(_S3_CHUNK_SIZE):
+            yield chunk
+
+    return StreamingHttpResponse(_iter_body(), content_type=content_type)
 
 
 def get_image_file(image_url: str) -> str:
