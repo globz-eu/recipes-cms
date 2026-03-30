@@ -1,4 +1,3 @@
-import io
 from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
@@ -161,7 +160,10 @@ class GetImageTypeTests(APITestCase):
 def _make_s3_client_mock(body: bytes = b"imagedata", content_type: str = "image/jpeg"):
     """Return a mock boto3 S3 client whose get_object returns the given body."""
     mock_body = MagicMock()
-    mock_body.read.side_effect = [body, b""]  # first read returns data, second signals EOF
+    mock_body.read.side_effect = [
+        body,
+        b"",
+    ]  # first read returns data, second signals EOF
     mock_client = MagicMock()
     mock_client.get_object.return_value = {
         "Body": mock_body,
