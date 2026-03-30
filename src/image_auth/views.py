@@ -1,3 +1,4 @@
+import functools
 import re
 
 import boto3
@@ -17,6 +18,7 @@ _MEDIA_PREFIX = "/media/"
 _S3_CHUNK_SIZE = 1024 * 1024  # 1 MB
 
 
+@functools.lru_cache(maxsize=1)
 def _get_s3_client():
     return boto3.client(
         "s3",
