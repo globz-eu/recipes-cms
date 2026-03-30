@@ -1,5 +1,7 @@
-from unittest.mock import patch
+import io
+from unittest.mock import MagicMock, patch
 
+from botocore.exceptions import ClientError
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from rest_framework import status
@@ -9,7 +11,7 @@ from image_auth.views import get_image_file, get_image_type
 
 User = get_user_model()
 
-IMAGE_AUTH_URL = "/api/image-auth/"
+IMAGE_AUTH_URL = "/image-auth/"
 RENDITION_URI = "/media/images/test.jpg"
 ORIGINAL_URI = "/media/original_images/test.jpg"
 INVALID_URI = "/media/other/test.jpg"
@@ -154,3 +156,91 @@ class GetImageTypeTests(APITestCase):
 
     def test_empty_string_returns_none(self):
         self.assertIsNone(get_image_type(""))
+
+
+def _make_s3_client_mock(body: bytes = b"imagedata", content_type: str = "image/jpeg"):
+    """Return a mock boto3 S3 client whose get_object returns the given body."""
+    mock_body = MagicMock()
+    mock_body.read.side_effect = [body, b""]  # first read returns data, second signals EOF
+    mock_client = MagicMock()
+    mock_client.get_object.return_value = {
+        "Body": mock_body,
+        "ContentType": content_type,
+    }
+    return mock_client
+
+
+def _make_client_error(code: str) -> ClientError:
+    return ClientError({"Error": {"Code": code, "Message": code}}, "GetObject")
+
+
+class ServeMediaViewTests(APITestCase):
+    """Tests for the serve_media view."""
+
+    RENDITION_URL = "/media/images/test.jpg"
+    ORIGINAL_URL = "/media/original_images/test.jpg"
+    MISSING_URL = "/media/images/missing.jpg"
+
+    # ------------------------------------------------------------------
+    # Successful streaming
+    # ------------------------------------------------------------------
+
+    @patch("image_auth.views._get_s3_client")
+    def test_rendition_streams_body(self, mock_get_client):
+        """A valid rendition path returns 200 and the S3 body."""
+        mock_get_client.return_value = _make_s3_client_mock(b"pixels", "image/jpeg")
+        response = self.client.get(self.RENDITION_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(b"".join(response.streaming_content), b"pixels")
+        self.assertIn("image/jpeg", response["Content-Type"])
+
+    @patch("image_auth.views._get_s3_client")
+    def test_original_image_streams_body(self, mock_get_client):
+        """A valid original_images path returns 200 and the S3 body."""
+        mock_get_client.return_value = _make_s3_client_mock(b"rawpixels", "image/png")
+        response = self.client.get(self.ORIGINAL_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(b"".join(response.streaming_content), b"rawpixels")
+        self.assertIn("image/png", response["Content-Type"])
+
+    @patch("image_auth.views._get_s3_client")
+    def test_correct_s3_key_is_requested(self, mock_get_client):
+        """The S3 GetObject call uses the bare key (without /media/ prefix)."""
+        mock_client = _make_s3_client_mock()
+        mock_get_client.return_value = mock_client
+        self.client.get(self.RENDITION_URL)
+        mock_client.get_object.assert_called_once_with(
+            Bucket=mock_client.get_object.call_args.kwargs["Bucket"],
+            Key="images/test.jpg",
+        )
+
+    # ------------------------------------------------------------------
+    # 404 handling
+    # ------------------------------------------------------------------
+
+    @patch("image_auth.views._get_s3_client")
+    def test_no_such_key_returns_404(self, mock_get_client):
+        """ClientError with NoSuchKey results in 404."""
+        mock_client = MagicMock()
+        mock_client.get_object.side_effect = _make_client_error("NoSuchKey")
+        mock_get_client.return_value = mock_client
+        response = self.client.get(self.MISSING_URL)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch("image_auth.views._get_s3_client")
+    def test_404_error_code_returns_404(self, mock_get_client):
+        """ClientError with code '404' results in 404."""
+        mock_client = MagicMock()
+        mock_client.get_object.side_effect = _make_client_error("404")
+        mock_get_client.return_value = mock_client
+        response = self.client.get(self.MISSING_URL)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch("image_auth.views._get_s3_client")
+    def test_other_client_error_propagates(self, mock_get_client):
+        """Other ClientErrors (e.g. AccessDenied) are not swallowed."""
+        mock_client = MagicMock()
+        mock_client.get_object.side_effect = _make_client_error("AccessDenied")
+        mock_get_client.return_value = mock_client
+        with self.assertRaises(ClientError):
+            self.client.get(self.MISSING_URL)

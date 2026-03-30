@@ -25,6 +25,20 @@ def format(c):
     c.run("uv run ruff format src")
 
 
+@task(
+    help={
+        "label": "Test label(s) to run (default: all tests).",
+        "verbosity": "Verbosity level: 0, 1, or 2 (default: 1).",
+    }
+)
+def test(c, label="", verbosity=1):
+    """Run the Django test suite inside the wagtail Docker Compose service."""
+    c.run(
+        f"docker compose exec wagtail uv run manage.py test {label} --verbosity={verbosity}",
+        pty=True,
+    )
+
+
 @task(help={"build": "Build images before running the development server."})
 def dev(c, build=False):
     """Run the development server with docker compose."""
