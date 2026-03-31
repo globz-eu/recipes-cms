@@ -1,10 +1,11 @@
-from django.shortcuts import redirect
-from django.contrib.auth import logout
-from django.views import View
-from django.conf import settings
-from django.http import HttpRequest, HttpResponse
-from urllib.parse import urlencode, urlunparse
 import logging
+from urllib.parse import urlencode, urlunparse
+
+from django.conf import settings
+from django.contrib.auth import logout
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import redirect
+from django.views import View
 
 logger = logging.getLogger(__name__)
 

@@ -2,9 +2,10 @@
 Social auth pipeline functions for Auth0 authentication.
 """
 
-from typing import Any, Optional, TYPE_CHECKING
-from django.contrib.auth.models import Group
 import logging
+from typing import TYPE_CHECKING, Any, Optional
+
+from django.contrib.auth.models import Group
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser

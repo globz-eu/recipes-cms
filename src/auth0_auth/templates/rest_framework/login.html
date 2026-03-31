@@ -1,0 +1,14 @@
+{% extends "rest_framework/login_base.html" %}
+{% load rest_framework %}
+
+{% block branding %}
+<h3 style="margin: 0 0 20px;">Django REST framework</h3>
+<div style="margin-bottom: 15px; text-align: center;">
+  <a href="{% url 'social:begin' 'auth0_openidconnect' %}?next={{ next }}"
+     class="btn btn-primary form-control"
+     style="display: block; margin-bottom: 10px;">
+    Login with Auth0
+  </a>
+  <hr style="margin: 15px 0;" />
+</div>
+{% endblock %}
