@@ -23,7 +23,11 @@ urlpatterns = [
     path("media/<path:image_path>", serve_media, name="serve-media"),
     path("documents/", include(wagtaildocs_urls)),
     # Override DRF logout to use Auth0-aware logout before including rest_framework urls
-    path("api-auth/logout/", CustomLogoutView.as_view(), name="rest_framework_logout"),
+    path(
+        "api-auth/logout/",
+        CustomLogoutView.as_view(redirect_url="/api/"),
+        name="rest_framework_logout",
+    ),
     path("api-auth/", include(rest_framework_urls, namespace="rest_framework")),
     path("", include("social_django.urls", namespace="social")),
 ]

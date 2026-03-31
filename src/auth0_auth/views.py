@@ -16,6 +16,11 @@ class CustomLogoutView(View):
     For Auth0, redirects to Auth0's logout endpoint with return_to parameter.
     """
 
+    redirect_url: str | None = None
+
+    def get_redirect_url(self) -> str:
+        return self.redirect_url or f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/"
+
     def get(self, request: HttpRequest) -> HttpResponse:
         logger.info(f"CustomLogoutView GET: Initiating logout for user: {request.user}")
         if request.user.is_authenticated:
@@ -35,7 +40,9 @@ class CustomLogoutView(View):
                         raise Exception(
                             "Auth0 settings not configured properly. Please set SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN and LOGOUT_REDIRECT_URL in your settings."
                         )
-                    return_to = request.build_absolute_uri(logout_redirect_url)
+                    return_to = request.build_absolute_uri(
+                        self.redirect_url or logout_redirect_url
+                    )
                     params = {
                         "post_logout_redirect_uri": return_to,
                         "client_id": getattr(
@@ -59,16 +66,16 @@ class CustomLogoutView(View):
                 else:
                     logger.info("Non-Auth0 user, performing regular logout")
                     logout(request)
-                    return redirect(f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
+                    return redirect(self.get_redirect_url())
 
             except Exception as e:
                 logger.exception(f"Error during social auth logout: {e}")
                 logger.info("Performing regular logout")
                 logout(request)
-                return redirect(f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
+                return redirect(self.get_redirect_url())
         else:
             logger.info("No authenticated user found, redirecting to admin login")
-            return redirect(f"/{settings.WAGTAIL_ADMIN_BASE_PATH}/")
+            return redirect(self.get_redirect_url())
 
     def post(self, request: HttpRequest) -> HttpResponse:
         logger.info(f"CustomLogoutView POST: request received for user: {request.user}")
