@@ -5,7 +5,8 @@ FROM debian:trixie-slim
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8000
 ARG DJANGO_SETTINGS_MODULE="recipe_cms.settings.production"
-ARG ARCH="amd64"
+ARG TARGETARCH
+ARG ARCH=${TARGETARCH:-amd64}
 ENV DJANGO_SETTINGS_MODULE=$DJANGO_SETTINGS_MODULE
 
 RUN apt-get update --yes --quiet && apt-get install --yes --quiet --no-install-recommends \
