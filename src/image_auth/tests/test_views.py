@@ -1,8 +1,10 @@
+from typing import TYPE_CHECKING, Iterable
 from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.http import StreamingHttpResponse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -196,7 +198,11 @@ class ServeMediaViewTests(APITestCase):
         self.client.login(username="editor", password="testpass123")
         response = self.client.get(self.RENDITION_URL)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(b"".join(response.streaming_content), b"pixels")
+        assert isinstance(response, StreamingHttpResponse)
+        content = response.streaming_content
+        if TYPE_CHECKING:
+            assert isinstance(content, Iterable)
+        self.assertEqual(b"".join(content), b"pixels")
         self.assertIn("image/jpeg", response["Content-Type"])
 
     @patch("image_auth.views.get_db_image", return_value=True)
@@ -207,7 +213,11 @@ class ServeMediaViewTests(APITestCase):
         self.client.login(username="editor", password="testpass123")
         response = self.client.get(self.ORIGINAL_URL)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(b"".join(response.streaming_content), b"rawpixels")
+        assert isinstance(response, StreamingHttpResponse)
+        content = response.streaming_content
+        if TYPE_CHECKING:
+            assert isinstance(content, Iterable)
+        self.assertEqual(b"".join(content), b"rawpixels")
         self.assertIn("image/png", response["Content-Type"])
 
     @patch("image_auth.views.get_db_image", return_value=True)
