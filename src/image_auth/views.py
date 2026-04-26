@@ -6,16 +6,39 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 from django.conf import settings
 from django.http import Http404, StreamingHttpResponse
+from rest_framework import permissions
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
-from rest_framework.response import Response
 from wagtail.images.models import Image
 
 from home.permissions import IsEditorOrAdmin
 
 _MEDIA_PREFIX = "/media/"
 _S3_CHUNK_SIZE = 1024 * 1024  # 1 MiB
+
+
+class MediaAccessPermission(permissions.BasePermission):
+    """
+    Permission class that controls access to media images.
+
+    - **403 Forbidden** - path cannot be mapped to a known image type, or no
+      matching image record in the database.
+    - **401 Unauthorized** - image exists but the user is not authenticated.
+    - **403 Forbidden** - image exists but the authenticated user lacks the
+      required role/group membership.
+    """
+
+    def has_permission(self, request: Request, view) -> bool:  # type: ignore[override]
+        image_path = view.kwargs.get("image_path", "")
+        image_type = get_image_type(image_path)
+        if not image_type:
+            raise PermissionDenied()
+
+        if not get_db_image(image_path, image_type):
+            raise PermissionDenied()
+
+        return IsEditorOrAdmin().has_permission(request, view)
 
 
 @functools.lru_cache(maxsize=1)
@@ -34,58 +57,15 @@ def _get_s3_client():
 
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
-def check_permissions(request: Request) -> Response:
-    """
-    Nginx auth_request endpoint that controls access to media images.
-
-    Expects the ``X-Original-Uriget_image_file`` header to be set by Nginx with the
-    originally requested media URL. The URI is resolved to an image in the
-    database, then checked against the caller's permissions:
-
-    - **200 OK** - image exists and the user is a superuser, staff, or a
-      member of the Editors group.
-    - **401 Unauthorized** - image exists but the user lacks the required
-      role/group membership.
-    - **403 Forbidden** - ``X-Original-Uri`` header is missing, the path
-      cannot be mapped to a known image type, or no matching image record
-      in the database.
-    """
-    try:
-        if not request.headers.get("X-Original-Uri"):
-            return Response(data={"message": "Forbidden"}, status=403)
-
-        requested_image = get_image_file(request.headers.get("X-Original-Uri"))
-        image_type = get_image_type(requested_image)
-
-        if not image_type:
-            return Response(data={"message": "Forbidden"}, status=403)
-
-        db_image = get_db_image(requested_image, image_type)
-        if not db_image:
-            return Response(data={"message": "Forbidden"}, status=403)
-
-        permission = IsEditorOrAdmin()
-        if not permission.has_permission(request, None):
-            return Response(data={"message": "Unauthorized"}, status=401)
-
-        return Response(data={"message": "OK"}, status=200)
-
-    except Exception as e:
-        return Response(data={"message": str(e)}, status=400)
-
-
-@api_view(["GET"])
-@permission_classes([AllowAny])
+@permission_classes([MediaAccessPermission])
 def serve_media(request: Request, image_path: str) -> StreamingHttpResponse:
     """
     Stream a private S3 object to the client.
 
-    This view is reached only after nginx has already performed the
-    ``auth_request /image-auth/`` gate check, so no additional permission
-    check is performed here.  The view fetches the object directly from
-    the private S3 bucket via boto3 (credentials from settings) and
-    streams it back in chunks, preserving the Content-Type returned by S3.
+    Permission is enforced by ``MediaAccessPermission`` before any S3 call is
+    made.  The view fetches the object directly from the private S3 bucket via
+    boto3 (credentials from settings) and streams it back in chunks,
+    preserving the Content-Type returned by S3.
 
     - **200 OK** - object found and streamed.
     - **404 Not Found** - no such key in the bucket.

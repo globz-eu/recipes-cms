@@ -8,7 +8,6 @@ from wagtail.documents import urls as wagtaildocs_urls
 
 from auth0_auth.views import CustomLogoutView
 from home.views import HomeViewSet
-from image_auth import urls as image_auth_urls
 from image_auth.views import serve_media
 
 router = DefaultRouter()
@@ -19,7 +18,6 @@ urlpatterns = [
     path("admin/logout/", CustomLogoutView.as_view(), name="wagtailadmin_logout"),
     path("admin/", include(wagtailadmin_urls)),
     path("api/", include(router.urls)),
-    path("image-auth/", include(image_auth_urls)),
     path("media/<path:image_path>", serve_media, name="serve-media"),
     path("documents/", include(wagtaildocs_urls)),
     # Override DRF logout to use Auth0-aware logout before including rest_framework urls
