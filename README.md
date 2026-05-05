@@ -228,8 +228,6 @@ docker compose exec s3 /garage bucket create recipes-cms
 docker compose exec s3 /garage key create recipes-cms-key
 docker compose exec s3 /garage bucket allow --read --write --owner recipes-cms --key recipes-cms-key
 
-# 4. Enable website mode (required for public /media/ access via nginx)
-docker compose exec s3 /garage bucket website --allow recipes-cms
 
 # 5. Copy the printed key ID / secret into your .env as S3_ACCESS_KEY / S3_SECRET_KEY
 ```
