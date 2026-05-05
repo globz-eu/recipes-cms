@@ -16,8 +16,8 @@ services:
       - source: wagtail-static
         target: /usr/share/nginx/html/static
         type: volume
-      - source: frontend
-        target: /usr/share/nginx/html
+      - source: frontend/dist
+        target: /usr/share/nginx/html/frontend
         type: bind
     depends_on:
       wagtail:
