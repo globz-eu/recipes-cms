@@ -15,7 +15,11 @@ router.register("home", HomeViewSet, basename="home")
 urlpatterns = [
     path("django-admin/", admin.site.urls),
     # Override Wagtail admin logout before including wagtailadmin_urls
-    path("admin/logout/", CustomLogoutView.as_view(), name="wagtailadmin_logout"),
+    path(
+        "admin/logout/",
+        CustomLogoutView.as_view(redirect_url="/admin/"),
+        name="wagtailadmin_logout",
+    ),
     path("admin/", include(wagtailadmin_urls)),
     path("api/", include(router.urls)),
     path("media/<path:image_path>", serve_media, name="serve-media"),

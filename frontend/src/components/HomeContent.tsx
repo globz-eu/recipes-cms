@@ -14,7 +14,7 @@ export function HomeContent({ pages }: HomeContentProps) {
         </article>
       ))}
       <footer>
-        <a href="/admin/logout/">Log out</a>
+        <a href={`/admin/logout/?next=${encodeURIComponent(window.location.pathname)}`}>Log out</a>
       </footer>
     </div>
   )
