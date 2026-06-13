@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "django-storages[s3]>=1.14",
+    "gunicorn>=26.0.0",
     "psycopg2-binary>=2.9.10",
     "social-auth-app-django>=5.4.3",
     "wagtail>=7.1.3",
