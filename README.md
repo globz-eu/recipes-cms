@@ -64,6 +64,7 @@ src/
 ## API Endpoints
 
 - `/api/home/` - HomePage content (GET)
+- `/api/csrf/` - Returns a CSRF token (`{"csrfToken": ...}`) for cross-origin clients; send it back as `X-CSRFToken` on unsafe requests
 - `/admin/` - Wagtail admin interface (requires authentication)
 - `/admin/logout/` - Custom logout endpoint
 
@@ -196,7 +197,7 @@ Media files (images, documents) are stored in [Garage](https://garagehq.deuxfleu
 #### How it works
 
 - The `wagtail` container uploads files directly to Garage on port 3900 (S3 API) using `django-storages` with the `S3Boto3Storage` backend.
-- Browsers fetch media via nginx at `/media/`, which proxies to Garage's web endpoint (port 3902). This avoids exposing Garage directly and keeps the public URL stable.
+- Browsers fetch media via nginx at `/media/`, which proxies to Django's `serve_media` view (`image_auth`). It checks that the user is authenticated and allowed (Editors group, staff or superuser) before streaming the object from S3.
 - `wagtail-storages` manages per-object ACLs so documents in private Wagtail collections are not publicly accessible.
 
 #### S3_CUSTOM_DOMAIN
@@ -204,7 +205,7 @@ Media files (images, documents) are stored in [Garage](https://garagehq.deuxfleu
 `S3_CUSTOM_DOMAIN` controls the base URL that Django generates for uploaded files. Set it to the public hostname and path prefix that nginx uses to serve media:
 
 ```bash
-# Local dev (nginx on :8080, proxying /media/ to Garage)
+# Local dev (nginx on :8080, proxying /media/ to Django)
 S3_CUSTOM_DOMAIN=localhost:8080/media
 S3_URL_PROTOCOL=http:
 
@@ -239,6 +240,36 @@ If documents were uploaded before `wagtail-storages` was active, run:
 ```bash
 docker compose exec wagtail uv run manage.py fix_document_acls
 ```
+
+## Deployment
+
+Staging runs on Scaleway and is managed by the Pulumi project in
+[recipes-infrastructure](../recipes-infrastructure) (stack `staging`). The compose services map to:
+
+| compose    | Scaleway                                                                |
+|------------|-------------------------------------------------------------------------|
+| `wagtail`  | Serverless Container (`staging.<domain>`) + Serverless Jobs for `migrate` and `collectstatic` |
+| `database` | Serverless SQL Database                                                 |
+| `s3`       | Object Storage: private media bucket + public static bucket             |
+| `nginx`    | Edge Services CDN (`static.staging.<domain>`) serving `/static/` and `/frontend/` |
+
+Because Edge Services can't use a container as origin, the frontend is served from the static
+host and calls the API cross-origin with credentials. The production settings read these
+extra variables:
+
+| Variable | Purpose |
+|----------|---------|
+| `ALLOWED_HOSTS` | Comma-separated hosts, e.g. `staging.example.com` |
+| `CSRF_TRUSTED_ORIGINS` | Origins allowed to POST, e.g. `https://staging.example.com,https://static.staging.example.com` |
+| `CORS_ALLOWED_ORIGINS` | Origins allowed to call the API with credentials (the frontend origin) |
+| `SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS` | Extra hosts login/logout may redirect back to (the frontend host) |
+| `STATIC_BUCKET_NAME`, `STATIC_CUSTOM_DOMAIN` | Collect static files to S3 and serve them from the CDN domain |
+| `S3_REGION_NAME` | Object storage region (`fr-par` on Scaleway, `garage` locally) |
+| `POSTGRES_SSLMODE` | libpq `sslmode` (`require` for Serverless SQL) |
+| `WAGTAILADMIN_BASE_URL` | Public base URL of the admin |
+
+Build the frontend for a cross-origin deployment with `VITE_API_BASE_URL=https://staging.<domain> npm run build`.
+Releases are built by CI on `v*.*.*` tags (`invoke bump`); see the infrastructure repo's README for deploying.
 
 ## Authentication Flow
 
