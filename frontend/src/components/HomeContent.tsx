@@ -1,3 +1,4 @@
+import { apiUrl, resetCsrfToken } from '../api/client'
 import type { HomePage } from '../api/home'
 
 interface HomeContentProps {
@@ -14,7 +15,12 @@ export function HomeContent({ pages }: HomeContentProps) {
         </article>
       ))}
       <footer>
-        <a href={`/admin/logout/?next=${encodeURIComponent(window.location.pathname)}`}>Log out</a>
+        <a
+          href={apiUrl(`/admin/logout/?next=${encodeURIComponent(window.location.href)}`)}
+          onClick={resetCsrfToken}
+        >
+          Log out
+        </a>
       </footer>
     </div>
   )
