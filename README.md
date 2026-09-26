@@ -269,8 +269,8 @@ extra variables:
 | `WAGTAILADMIN_BASE_URL` | Public base URL of the admin |
 
 The frontend lives in [recipes-frontend](https://github.com/globz-eu/recipes-frontend); compose serves
-`../recipes-frontend/dist` at `/frontend/`. Build it for a cross-origin deployment with
-`VITE_API_BASE_URL=https://staging.<domain> npm run build`.
+`../recipes-frontend/dist` at `/frontend/`. Its build is environment-independent: deployments use a
+release and write a `config.json` pointing it at the API host.
 Releases are built by CI on `v*.*.*` tags (`invoke bump`); see the infrastructure repo's README for deploying.
 
 ## Authentication Flow
