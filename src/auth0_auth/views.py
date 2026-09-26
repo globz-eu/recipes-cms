@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib.auth import logout
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 
 logger = logging.getLogger(__name__)
@@ -19,9 +20,20 @@ class CustomLogoutView(View):
     redirect_url: str | None = None
 
     def get_redirect_url(self, request: HttpRequest) -> str:
-        return (
-            request.GET.get("next") or self.redirect_url or settings.LOGOUT_REDIRECT_URL
-        )
+        next_url = request.GET.get("next")
+        allowed_hosts = {
+            request.get_host(),
+            *getattr(settings, "SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS", []),
+        }
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts=allowed_hosts,
+            require_https=request.is_secure(),
+        ):
+            return next_url
+        if next_url:
+            logger.warning("Ignoring disallowed logout redirect: %s", next_url)
+        return self.redirect_url or settings.LOGOUT_REDIRECT_URL
 
     def get(self, request: HttpRequest) -> HttpResponse:
         logger.info(f"CustomLogoutView GET: Initiating logout for user: {request.user}")

@@ -7,7 +7,7 @@ from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.documents import urls as wagtaildocs_urls
 
 from auth0_auth.views import CustomLogoutView
-from home.views import HomeViewSet
+from home.views import CsrfTokenView, HomeViewSet
 from image_auth.views import serve_media
 
 router = DefaultRouter()
@@ -21,6 +21,7 @@ urlpatterns = [
         name="wagtailadmin_logout",
     ),
     path("admin/", include(wagtailadmin_urls)),
+    path("api/csrf/", CsrfTokenView.as_view(), name="api-csrf"),
     path("api/", include(router.urls)),
     path("media/<path:image_path>", serve_media, name="serve-media"),
     path("documents/", include(wagtaildocs_urls)),

@@ -210,3 +210,73 @@ class CustomLogoutViewTestCase(TestCase):
         mock_logout.assert_called_once()
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], settings.LOGOUT_REDIRECT_URL)
+
+    @patch("auth0_auth.views.logout")
+    def test_relative_next_is_used(self, mock_logout):
+        """A relative ?next URL on the current host is honoured."""
+        request = self.factory.get("/admin/logout/", {"next": "/frontend/"})
+        request.user = self.user
+        request = self._add_session_to_request(request)
+
+        response = self.view(request)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/frontend/")
+
+    @override_settings(SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["static.example.com"])
+    @patch("auth0_auth.views.logout")
+    def test_absolute_next_on_allowed_host_is_used(self, mock_logout):
+        """An absolute ?next URL on an allowed redirect host is honoured."""
+        next_url = "http://static.example.com/frontend/"
+        request = self.factory.get("/admin/logout/", {"next": next_url})
+        request.user = self.user
+        request = self._add_session_to_request(request)
+
+        response = self.view(request)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], next_url)
+
+    @override_settings(SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["static.example.com"])
+    @patch("auth0_auth.views.logout")
+    def test_absolute_next_on_disallowed_host_is_ignored(self, mock_logout):
+        """An absolute ?next URL on an unknown host falls back to the default."""
+        request = self.factory.get(
+            "/admin/logout/", {"next": "https://evil.example.org/"}
+        )
+        request.user = self.user
+        request = self._add_session_to_request(request)
+
+        response = self.view(request)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], settings.LOGOUT_REDIRECT_URL)
+
+    @override_settings(
+        SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN="test-domain.auth0.com",
+        SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY="test-client-id",
+        SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["static.example.com"],
+    )
+    @patch("auth0_auth.views.logout")
+    def test_auth0_logout_return_to_allowed_absolute_next(self, mock_logout):
+        """Auth0 returnTo uses an allowed absolute ?next URL unchanged."""
+        next_url = "http://static.example.com/frontend/"
+        request = self.factory.get("/admin/logout/", {"next": next_url})
+        request.user = self.user
+        request = self._add_session_to_request(request)
+
+        mock_social = Mock()
+        mock_social.provider = "auth0_openidconnect"
+        mock_social_queryset = Mock()
+        mock_social_queryset.first.return_value = mock_social
+
+        with patch.object(
+            type(request.user), "social_auth", mock_social_queryset, create=True
+        ):
+            response = self.view(request)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(
+            "returnTo=http%3A%2F%2Fstatic.example.com%2Ffrontend%2F",
+            response["Location"],
+        )
