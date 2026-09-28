@@ -7,5 +7,5 @@ Tests are organized into:
 - test_pipeline.py: Tests for pipeline functions (add_user_to_editors_group)
 """
 
-from auth0_auth.tests.test_views import *  # noqa: F401, F403
 from auth0_auth.tests.test_pipeline import *  # noqa: F401, F403
+from auth0_auth.tests.test_views import *  # noqa: F401, F403

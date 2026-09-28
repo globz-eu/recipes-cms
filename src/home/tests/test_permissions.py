@@ -1,7 +1,9 @@
-from django.test import TestCase, RequestFactory
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group, AnonymousUser
 from unittest.mock import Mock
+
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser, Group
+from django.test import RequestFactory, TestCase
+
 from home.permissions import IsEditorOrAdmin
 
 User = get_user_model()

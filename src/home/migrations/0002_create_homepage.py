@@ -10,12 +10,8 @@ def create_homepage(apps, schema_editor):
 
     # Delete the default homepage (of type Page) as created by wagtailcore.0002_initial_data,
     # if it exists
-    page_content_type = ContentType.objects.get(
-        model="page", app_label="wagtailcore"
-    )
-    Page.objects.filter(
-        content_type=page_content_type, slug="home", depth=2
-    ).delete()
+    page_content_type = ContentType.objects.get(model="page", app_label="wagtailcore")
+    Page.objects.filter(content_type=page_content_type, slug="home", depth=2).delete()
 
     # Create content type for homepage model
     homepage_content_type, __ = ContentType.objects.get_or_create(
@@ -52,7 +48,6 @@ def remove_homepage(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     run_before = [
         ("wagtailcore", "0053_locale_model"),
     ]

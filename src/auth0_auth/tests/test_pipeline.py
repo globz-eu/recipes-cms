@@ -1,7 +1,9 @@
-from django.test import TestCase
+from unittest.mock import Mock, patch
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from unittest.mock import Mock, patch
+from django.test import TestCase
+
 from auth0_auth.pipeline import add_user_to_editors_group
 
 User = get_user_model()

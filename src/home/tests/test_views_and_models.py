@@ -1,13 +1,12 @@
-from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-
-from home.models import HomePage
-
 from wagtail.models import Page
 from wagtail.test.utils import WagtailPageTestCase
+
+from home.models import HomePage
 
 User = get_user_model()
 

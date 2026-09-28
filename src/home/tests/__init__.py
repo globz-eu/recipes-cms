@@ -7,5 +7,5 @@ Tests are organized into:
 - test_permissions.py: Tests for permission classes (IsEditorOrAdminPermissionTests)
 """
 
-from home.tests.test_views_and_models import *  # noqa: F401, F403
 from home.tests.test_permissions import *  # noqa: F401, F403
+from home.tests.test_views_and_models import *  # noqa: F401, F403

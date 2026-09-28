@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('home', '0002_create_homepage'),
+        ("home", "0002_create_homepage"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='homepage',
-            name='description',
+            model_name="homepage",
+            name="description",
             field=models.CharField(blank=True, max_length=255, null=True),
         ),
     ]
