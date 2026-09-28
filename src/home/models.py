@@ -6,4 +6,5 @@ class HomePage(Page):
     description = models.CharField(max_length=255, blank=True, null=True)
     api_fields = ["title", "description"]
     parent_page_types = ["wagtailcore.Page"]
+    subpage_types = ["recipes.RecipePage"]
     max_count = 1

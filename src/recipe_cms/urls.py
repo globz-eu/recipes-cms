@@ -9,9 +9,11 @@ from wagtail.documents import urls as wagtaildocs_urls
 from auth0_auth.views import CustomLogoutView
 from home.views import CsrfTokenView, HomeViewSet
 from image_auth.views import serve_media
+from recipes.views import RecipeViewSet
 
 router = DefaultRouter()
 router.register("home", HomeViewSet, basename="home")
+router.register("recipes", RecipeViewSet, basename="recipes")
 urlpatterns = [
     path("django-admin/", admin.site.urls),
     # Override Wagtail admin logout before including wagtailadmin_urls

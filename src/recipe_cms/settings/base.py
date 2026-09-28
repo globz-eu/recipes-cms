@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "image_auth",
     "auth0_auth",
     "home",
+    "recipes",
     "storages",
     "wagtail_storages",
     "django.contrib.postgres",
