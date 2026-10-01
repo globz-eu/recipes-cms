@@ -9,6 +9,8 @@ from .serializers import RecipeSerializer
 
 class RecipeViewSet(ReadOnlyModelViewSet):
     serializer_class = RecipeSerializer
-    queryset = RecipePage.objects.live().order_by("title")
+    queryset = (
+        RecipePage.objects.live().order_by("title").prefetch_related("ingredients")
+    )
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsEditorOrAdmin]

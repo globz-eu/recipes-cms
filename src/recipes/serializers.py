@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from wagtail.rich_text import expand_db_html
 
-from .models import RecipePage
+from .models import RecipeIngredient, RecipePage
 
 
 class RichTextField(serializers.CharField):
@@ -11,8 +11,18 @@ class RichTextField(serializers.CharField):
         return expand_db_html(value)
 
 
+class RecipeIngredientSerializer(serializers.ModelSerializer):
+    quantity = serializers.DecimalField(
+        max_digits=8, decimal_places=2, coerce_to_string=False, read_only=True
+    )
+
+    class Meta:
+        model = RecipeIngredient
+        fields = ["quantity", "unit", "name"]
+
+
 class RecipeSerializer(serializers.ModelSerializer):
-    ingredients = RichTextField(read_only=True)
+    ingredients = RecipeIngredientSerializer(many=True, read_only=True)
     preparation = RichTextField(read_only=True)
 
     class Meta:

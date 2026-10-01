@@ -7,7 +7,7 @@ from wagtail.models import Page
 from wagtail.test.utils import WagtailPageTestCase
 
 from home.models import HomePage
-from recipes.models import RecipePage
+from recipes.models import RecipeIngredient, RecipePage
 
 User = get_user_model()
 
@@ -33,7 +33,11 @@ class RecipePageStructureTests(WagtailPageTestCase):
         homepage = HomePage.objects.first()
         recipe = RecipePage(
             title="Pancakes",
-            ingredients="<ul><li>Flour</li><li>Milk</li><li>Eggs</li></ul>",
+            ingredients=[
+                RecipeIngredient(quantity=200, unit="g", name="Flour"),
+                RecipeIngredient(quantity=300, unit="ml", name="Milk"),
+                RecipeIngredient(quantity=2, name="Eggs"),
+            ],
             preparation="<p>Mix and fry.</p>",
             preparation_time=10,
             cooking_time=15,
@@ -42,6 +46,10 @@ class RecipePageStructureTests(WagtailPageTestCase):
         homepage.add_child(instance=recipe)
         self.assertTrue(RecipePage.objects.filter(title="Pancakes").exists())
         self.assertEqual(recipe.get_parent().specific, homepage)
+        self.assertEqual(
+            [str(i) for i in recipe.ingredients.all()],
+            ["200 g Flour", "300 ml Milk", "2 Eggs"],
+        )
 
 
 class RecipeViewSetTests(APITestCase):
@@ -53,7 +61,10 @@ class RecipeViewSetTests(APITestCase):
         homepage = HomePage.objects.first()
         self.recipe = RecipePage(
             title="Pancakes",
-            ingredients="<ul><li>Flour</li></ul>",
+            ingredients=[
+                RecipeIngredient(quantity="1.5", unit="cups", name="Flour"),
+                RecipeIngredient(name="Salt"),
+            ],
             preparation="<p>Mix and fry.</p>",
             preparation_time=10,
             cooking_time=15,
@@ -89,7 +100,13 @@ class RecipeViewSetTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["title"], "Pancakes")
-        self.assertEqual(response.data["ingredients"], "<ul><li>Flour</li></ul>")
+        self.assertEqual(
+            response.data["ingredients"],
+            [
+                {"quantity": 1.5, "unit": "cups", "name": "Flour"},
+                {"quantity": None, "unit": "", "name": "Salt"},
+            ],
+        )
         self.assertEqual(response.data["preparation"], "<p>Mix and fry.</p>")
         self.assertEqual(response.data["preparation_time"], 10)
         self.assertEqual(response.data["cooking_time"], 15)
