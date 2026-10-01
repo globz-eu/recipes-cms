@@ -146,6 +146,21 @@ docker compose exec wagtail uv run manage.py createsuperuser
 docker compose exec wagtail uv run manage.py collectstatic
 ```
 
+#### Create or update an admin user
+
+`ensure_admin` creates a superuser, or updates an existing user with that username to be an
+active superuser with the given password (and email, if given). It is idempotent, so it can
+run on every deploy. The password is read only from `DJANGO_ADMIN_PASSWORD`, so it never
+shows up in the process list or shell history:
+
+```bash
+docker compose exec -e DJANGO_ADMIN_PASSWORD='…' wagtail \
+  uv run manage.py ensure_admin --username admin --email admin@example.com
+```
+
+`--username` and `--email` default to `DJANGO_ADMIN_USERNAME` and `DJANGO_ADMIN_EMAIL`. The
+password must pass Django's password validators.
+
 ### Running Tests
 
 ```bash
@@ -248,7 +263,7 @@ Staging runs on Scaleway and is managed by the Pulumi project in
 
 | compose    | Scaleway                                                                |
 |------------|-------------------------------------------------------------------------|
-| `wagtail`  | Serverless Container (`staging.<domain>`) + Serverless Jobs for `migrate` and `collectstatic` |
+| `wagtail`  | Serverless Container (`staging.<domain>`) + Serverless Jobs for `migrate`, `collectstatic` and `ensure_admin` |
 | `database` | Serverless SQL Database                                                 |
 | `s3`       | Object Storage: private media bucket + public static bucket             |
 | `nginx`    | Edge Services CDN (`static.staging.<domain>`) serving `/static/` and `/frontend/` |
