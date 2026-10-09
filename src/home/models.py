@@ -7,4 +7,3 @@ class HomePage(Page):
     api_fields = ["title", "description"]
     parent_page_types = ["wagtailcore.Page"]
     subpage_types = ["recipes.RecipePage"]
-    max_count = 1

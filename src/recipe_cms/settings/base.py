@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "wagtail.contrib.redirects",
     "wagtail.embeds",
     "wagtail.sites",
+    "wagtail.locales",
     "wagtail.users",
     "wagtail.snippets",
     "wagtail.documents",
@@ -188,11 +189,23 @@ SOCIAL_AUTH_PIPELINE = (
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "en"
+
+LANGUAGES = [
+    ("en", "English"),
+    ("de", "Deutsch"),
+    ("fr", "Français"),
+]
 
 TIME_ZONE = "UTC"
 
 USE_I18N = True
+
+# Content languages: recipes and the homepage exist once per locale, with
+# translations linked by translation_key.
+WAGTAIL_I18N_ENABLED = True
+
+WAGTAIL_CONTENT_LANGUAGES = LANGUAGES
 
 USE_TZ = True
 
