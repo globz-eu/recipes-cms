@@ -114,6 +114,24 @@ class BulkUploadTests(APITestCase):
         )
         self.assertIsNotNone(recipe.latest_revision)
 
+    def test_preparation_is_sanitized(self):
+        dirty = '<p onclick="x()">Mix</p><script>alert(1)</script><a href="javascript:x()">y</a>'
+        response = self.upload_json(pancakes(en={**EN_PANCAKES, "preparation": dirty}))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        preparation = RecipePage.objects.get(slug="pancakes").preparation
+        self.assertNotIn("<script", preparation)
+        self.assertNotIn("onclick", preparation)
+        self.assertNotIn("javascript:", preparation)
+        self.assertIn("Mix", preparation)
+
+    def test_page_link_in_preparation_is_kept(self):
+        link = f'<p><a id="{self.homepages["en"].id}" linktype="page">Home</a></p>'
+        self.upload_json(pancakes(en={**EN_PANCAKES, "preparation": link}))
+
+        preparation = RecipePage.objects.get(slug="pancakes").preparation
+        self.assertIn('linktype="page"', preparation)
+
     def test_editor_upload_is_draft(self):
         response = self.upload_json(pancakes(en=EN_PANCAKES), user=self.editor_user)
 

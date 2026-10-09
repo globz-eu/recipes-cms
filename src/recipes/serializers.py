@@ -5,6 +5,7 @@ from django.conf import settings
 from django.core.files.uploadedfile import UploadedFile
 from django.utils.text import slugify
 from rest_framework import serializers
+from wagtail.admin.rich_text.converters.editor_html import EditorHTMLConverter
 from wagtail.rich_text import expand_db_html
 
 from .models import RecipeIngredient, RecipePage
@@ -82,6 +83,14 @@ class RecipeTranslationInputSerializer(serializers.Serializer):
         min_value=0, max_value=32767, required=False, allow_null=True, default=None
     )
     live = serializers.BooleanField(required=False, default=True)
+
+    def validate_preparation(self, value: str) -> str:
+        # Uploads bypass the Wagtail editor, so apply the same allowlist it
+        # does; the API renders this field as HTML. The round trip through the
+        # editor format keeps page links and embeds intact.
+        features = RecipePage._meta.get_field("preparation").features
+        converter = EditorHTMLConverter(features=features)
+        return converter.to_database_format(converter.from_database_format(value))
 
     def validate(self, attrs: dict) -> dict:
         if not attrs.get("slug"):
