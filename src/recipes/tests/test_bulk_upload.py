@@ -96,6 +96,10 @@ class BulkUploadTests(APITestCase):
         response = self.upload_json(pancakes(en=EN_PANCAKES))
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn(
+            "More than one homepage exists for locale 'en'.",
+            response.data["non_field_errors"],
+        )
         self.assertFalse(RecipePage.objects.filter(slug="pancakes").exists())
 
     def test_unauthenticated(self):

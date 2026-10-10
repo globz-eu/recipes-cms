@@ -207,6 +207,16 @@ class HomePagePerLocaleTests(WagtailPageTestCase):
         with self.assertRaises(ValidationError):
             Page.objects.get(pk=1).add_child(instance=duplicate)
 
+    def test_cannot_add_or_copy_a_homepage_in_a_locale_with_one(self):
+        root = Page.objects.get(pk=1)
+        superuser = User.objects.create_superuser(
+            username="root", email="root@test.com", password="testpass123"
+        )
+        homepage = HomePage.objects.get(locale__language_code="en")
+
+        self.assertFalse(HomePage.can_create_at(root))
+        self.assertFalse(homepage.permissions_for_user(superuser).can_copy_to(root))
+
     def test_existing_homepages_are_valid(self):
         for homepage in HomePage.objects.all():
             homepage.clean()
