@@ -249,7 +249,8 @@ class BulkUploadTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(RecipePage.objects.get(slug="pancakes").live)
-        titles = [r["title"] for r in self.client.get(reverse("recipes-list")).data]
+        response = self.client.get(reverse("recipes-list"), {"locale": "en"})
+        titles = [r["title"] for r in response.data]
         self.assertNotIn("Pancakes", titles)
 
     def assertNothingWritten(self, response):
@@ -366,11 +367,15 @@ class LocaleFilterTests(APITestCase):
         )
         self.client.post(URL, pancakes(en=EN_PANCAKES, de=DE_PANCAKES), format="json")
 
-    def test_list_defaults_to_english(self):
+    def test_list_without_locale_groups_recipes_by_locale(self):
         response = self.client.get(reverse("recipes-list"))
 
-        self.assertEqual([r["title"] for r in response.data], ["Pancakes"])
-        self.assertEqual(response.data[0]["locale"], "en")
+        self.assertEqual(list(response.data), ["locales"])
+        locales = response.data["locales"]
+        self.assertEqual([r["title"] for r in locales["en"]], ["Pancakes"])
+        self.assertEqual([r["title"] for r in locales["de"]], ["Pfannkuchen"])
+        self.assertEqual(locales["fr"], [])
+        self.assertEqual(locales["nl"], [])
 
     def test_list_german(self):
         response = self.client.get(reverse("recipes-list"), {"locale": "de"})

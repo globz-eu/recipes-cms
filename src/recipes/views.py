@@ -5,6 +5,7 @@ from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
+from wagtail.models import Locale
 
 from home.locales import get_requested_locale
 from home.permissions import IsEditorOrAdmin
@@ -27,9 +28,27 @@ class RecipeViewSet(ReadOnlyModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        if self.action == "list":
+        if self.action == "list" and "locale" in self.request.query_params:
             queryset = queryset.filter(locale=get_requested_locale(self.request))
         return queryset
+
+    def list(self, request: Request, *args, **kwargs) -> Response:
+        """
+        Returns the recipes of the locale given by ?locale= as a list. Without
+        the parameter, returns all recipes as {"locales": {<code>: [...]}}.
+        """
+        if "locale" in request.query_params:
+            return super().list(request, *args, **kwargs)
+
+        recipes = self.get_serializer(
+            self.filter_queryset(self.get_queryset()), many=True
+        )
+        by_locale = {
+            code: [] for code in Locale.objects.values_list("language_code", flat=True)
+        }
+        for recipe in recipes.data:
+            by_locale[recipe["locale"]].append(recipe)
+        return Response({"locales": by_locale})
 
     @action(
         detail=False,

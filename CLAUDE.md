@@ -52,4 +52,3 @@ Staging runs on Scaleway, managed by the sibling `recipes-infrastructure` Pulumi
 
 - Ruff: line length 88, double quotes, import sorting enabled (`I`).
 - Tests live in `<app>/tests/` and use Django's test runner (not pytest).
-- `TODO.md` tracks open follow-ups.

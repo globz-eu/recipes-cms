@@ -89,7 +89,7 @@ class RecipeViewSetTests(APITestCase):
         response = self.client.get(reverse("recipes-list"))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        titles = [recipe["title"] for recipe in response.data]
+        titles = [recipe["title"] for recipe in response.data["locales"]["en"]]
         self.assertIn("Pancakes", titles)
         self.assertNotIn("Draft recipe", titles)
 

@@ -76,7 +76,7 @@ src/
 ## API Endpoints
 
 - `/api/home/` - HomePage content (GET); filter with `?locale=de` (default: `en`)
-- `/api/recipes/` - Published recipes (GET); filter with `?locale=de` (default: `en`). Detail (`/api/recipes/<id>/`) works for any locale. Each recipe includes `locale` and `translation_key`
+- `/api/recipes/` - Published recipes (GET); without `?locale=` returns all recipes grouped by locale as `{"locales": {"en": [...], "de": [...]}}`, with `?locale=de` returns a flat list for that locale. Detail (`/api/recipes/<id>/`) works for any locale. Each recipe includes `locale` and `translation_key`
 - `/api/recipes/bulk-upload/` - Bulk create/update recipes (POST, see below)
 - `/api/csrf/` - Returns a CSRF token (`{"csrfToken": ...}`) for cross-origin clients; send it back as `X-CSRFToken` on unsafe requests
 - `/admin/` - Wagtail admin interface (requires authentication)
