@@ -73,12 +73,25 @@ class DutchHomepageMigrationTests(TestCase):
 
     def test_reverse_removes_dutch_only(self):
         migration.create_dutch_homepage(self.apps, None)
+        HomePage.objects.get(locale__language_code="nl").add_child(
+            instance=RecipePage(
+                title="Pannenkoeken",
+                slug="pannenkoeken",
+                preparation="<p>Bakken.</p>",
+                preparation_time=1,
+                cooking_time=1,
+                number_of_people=1,
+            )
+        )
+        self.assertEqual(RecipePage.objects.count(), 2)
+
         migration.remove_dutch_homepage(self.apps, None)
 
         self.assertFalse(Locale.objects.filter(language_code="nl").exists())
         self.assertEqual(HomePage.objects.count(), 3)
         self.assertEqual(Page.objects.get(depth=1).numchild, 3)
         self.assertEqual(RecipePage.objects.count(), 1)
+        self.assertFalse(RecipePage.objects.filter(slug="pannenkoeken").exists())
 
     def test_without_homepage_does_nothing(self):
         RecipePage.objects.all().delete()

@@ -63,6 +63,9 @@ def remove_dutch_homepage(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("home", "0004_locales_and_translated_homepages"),
+        # The reverse deletes Dutch recipes, so the historical state must know
+        # RecipePage and RecipeIngredient for the page delete to cascade to them
+        ("recipes", "0002_recipeingredient"),
     ]
 
     operations = [
