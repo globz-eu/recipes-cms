@@ -58,7 +58,7 @@ def create_user(username: str, *groups: str):
 class LocaleSetUpTests(APITestCase):
     def test_translated_homepages_exist(self):
         en_home = HomePage.objects.get(locale__language_code="en", depth=2)
-        for code in ["de", "fr"]:
+        for code in ["de", "fr", "nl"]:
             homepage = HomePage.objects.get(locale__language_code=code)
             self.assertEqual(homepage.translation_key, en_home.translation_key)
             self.assertEqual(homepage.get_parent().depth, 1)
@@ -78,7 +78,7 @@ class BulkUploadTests(APITestCase):
             code: HomePage.objects.filter(locale__language_code=code)
             .order_by("path")
             .first()
-            for code in ["en", "de", "fr"]
+            for code in ["en", "de", "fr", "nl"]
         }
 
     def upload_json(self, payload, user=None):
@@ -179,6 +179,19 @@ class BulkUploadTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(RecipePage.objects.filter(slug="pancakes").exists())
+
+    def test_upload_dutch_recipe(self):
+        recipe = {"title": "Pannenkoeken", "preparation": "<p>Bak.</p>"}
+
+        response = self.upload_json({"recipes": [{"translations": {"nl": recipe}}]})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        page = RecipePage.objects.get(slug="pannenkoeken")
+        self.assertEqual(page.locale.language_code, "nl")
+        nl_home = HomePage.objects.get(locale__language_code="nl")
+        self.assertEqual(page.get_parent().pk, nl_home.pk)
+        listing = self.client.get(reverse("recipes-list"), {"locale": "nl"})
+        self.assertEqual([r["title"] for r in listing.data], ["Pannenkoeken"])
 
     def test_upload_top_level_list(self):
         response = self.upload_json([{"translations": {"en": EN_PANCAKES}}])

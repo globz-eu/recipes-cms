@@ -35,7 +35,7 @@ Django + Wagtail headless CMS: Wagtail admin for editors, DRF API under `/api/` 
 
 ### Multilingual model
 
-Wagtail i18n is enabled with `en` (default), `de`, `fr`. Each locale has its own HomePage tree (depth 2); each translation of a recipe lives under its locale's HomePage and translations are linked via a shared `translation_key`. Locales and translated homepages are created by data migrations (`home/migrations/0002`, `0004`), so tests and the importer rely on those homepages existing.
+Wagtail i18n is enabled with `en` (default), `de`, `fr`, `nl`. Each locale has its own HomePage tree (depth 2); each translation of a recipe lives under its locale's HomePage and translations are linked via a shared `translation_key`. Locales and translated homepages are created by data migrations (`home/migrations/0002`, `0004`, `0005`), so tests and the importer rely on those homepages existing.
 
 ### Bulk import semantics (`recipes/importer.py`)
 
