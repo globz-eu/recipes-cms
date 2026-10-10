@@ -30,7 +30,13 @@ SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET=your-client-secret
 - **REST API**: Read-only API endpoint for HomePage content
   - Endpoint: `/api/home/`
   - Serializes title and description fields
-- **Page Constraints**: Single instance home page (max_count = 1)
+- **Translations**: One HomePage per content language (`en`, `de`, `fr`), linked by Wagtail's `translation_key`
+
+### Recipes (`recipes`)
+
+- **RecipePage Model**: Wagtail page with preparation, times, servings and an orderable ingredient list
+- **Multilingual Content**: Wagtail i18n (`WAGTAIL_I18N_ENABLED`) with English (default), German and French; each language version lives under its locale's HomePage
+- **Bulk Upload**: Create or update recipes and their translations from a JSON file, via the API or the `import_recipes` management command
 
 ## Tech Stack
 
@@ -54,7 +60,13 @@ src/
 ├── home/               # Home page app
 │   ├── models.py       # HomePage model
 │   ├── views.py        # API viewsets
+│   ├── locales.py      # ?locale= query parameter handling
 │   └── serializers.py  # REST serializers
+├── recipes/            # Recipe pages app
+│   ├── models.py       # RecipePage and RecipeIngredient models
+│   ├── views.py        # API viewset incl. bulk upload
+│   ├── serializers.py  # Read and bulk upload serializers
+│   └── importer.py     # Bulk import service (API + import_recipes command)
 └── recipe_cms/         # Project settings
     ├── settings/       # Environment-specific settings
     └── urls.py         # URL configuration
@@ -63,10 +75,57 @@ src/
 
 ## API Endpoints
 
-- `/api/home/` - HomePage content (GET)
+- `/api/home/` - HomePage content (GET); filter with `?locale=de` (default: `en`)
+- `/api/recipes/` - Published recipes (GET); filter with `?locale=de` (default: `en`). Detail (`/api/recipes/<id>/`) works for any locale. Each recipe includes `locale` and `translation_key`
+- `/api/recipes/bulk-upload/` - Bulk create/update recipes (POST, see below)
 - `/api/csrf/` - Returns a CSRF token (`{"csrfToken": ...}`) for cross-origin clients; send it back as `X-CSRFToken` on unsafe requests
 - `/admin/` - Wagtail admin interface (requires authentication)
 - `/admin/logout/` - Custom logout endpoint
+
+### Bulk recipe upload
+
+`POST /api/recipes/bulk-upload/` accepts either a JSON file in the multipart field `file` (max. 5 MB) or the same JSON as the request body. It requires an Editors/staff session and the `X-CSRFToken` header.
+
+```bash
+curl -b cookies.txt -H "X-CSRFToken: $TOKEN" -F file=@recipes.json \
+  http://localhost:8000/api/recipes/bulk-upload/
+```
+
+Each entry groups the language versions of one recipe (max. 500 entries; a top-level list without `recipes` is accepted too):
+
+```json
+{
+  "recipes": [
+    {
+      "translations": {
+        "en": {
+          "title": "Pancakes",
+          "slug": "pancakes",
+          "preparation": "<p>Mix and fry.</p>",
+          "preparation_time": 10,
+          "cooking_time": 15,
+          "number_of_people": 4,
+          "ingredients": [{"quantity": 200, "unit": "g", "name": "Flour"}],
+          "live": true
+        },
+        "de": {"title": "Pfannkuchen", "ingredients": [{"quantity": 200, "unit": "g", "name": "Mehl"}]}
+      }
+    }
+  ]
+}
+```
+
+- Locale keys must be one of `en`, `de`, `fr`. Only `title` is required; `slug` defaults to the slugified title and `live` to `true`.
+- Recipes are matched by slug and locale: existing ones are updated (all fields and the ingredient list are replaced), new ones are created. Translations in one entry share a `translation_key`, so they appear as translations of each other in the Wagtail admin.
+- Wagtail page permissions apply: users who may not publish (the default Editors group) get draft revisions for a moderator to publish; `live` in the response shows the result.
+- The upload is all-or-nothing: on any error nothing is written and the response is `400` with errors keyed by entry index and locale.
+- The response lists `created` and `updated` pages with `id`, `slug`, `locale`, `translation_key` and `live`.
+
+The same file can be imported from the command line (no permission checks; pages are published as requested):
+
+```bash
+docker compose exec wagtail uv run manage.py import_recipes recipes.json
+```
 
 ## Development
 

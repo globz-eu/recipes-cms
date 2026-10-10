@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
+from .locales import get_requested_locale
 from .models import HomePage
 from .permissions import IsEditorOrAdmin
 from .serializers import HomeSerializer
@@ -18,6 +19,12 @@ class HomeViewSet(ReadOnlyModelViewSet):
     queryset = HomePage.objects.all()
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsEditorOrAdmin]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.action == "list":
+            queryset = queryset.filter(locale=get_requested_locale(self.request))
+        return queryset
 
 
 @method_decorator(ensure_csrf_cookie, name="get")
