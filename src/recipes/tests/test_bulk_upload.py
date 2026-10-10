@@ -78,7 +78,7 @@ class BulkUploadTests(APITestCase):
             code: HomePage.objects.filter(locale__language_code=code)
             .order_by("path")
             .first()
-            for code in ["en", "de", "fr"]
+            for code in ["en", "de", "fr", "nl"]
         }
 
     def upload_json(self, payload, user=None):
