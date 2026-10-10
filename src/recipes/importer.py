@@ -182,6 +182,13 @@ def import_recipes(groups: list[dict], user=None) -> ImportResult:
                 errors[index] = error.errors
             except DjangoValidationError as error:
                 errors[index] = {"translations": error.messages}
+            else:
+                continue
+            # The savepoint was rolled back, but add_child had already bumped
+            # numchild on the shared homepage instances; reload it so later
+            # groups don't trip over a counter that no longer matches the DB
+            for homepage in homepages.values():
+                homepage.refresh_from_db(fields=["numchild"])
         if errors:
             transaction.set_rollback(True)
     if errors:

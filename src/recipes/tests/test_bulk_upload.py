@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import CommandError, call_command
 from django.urls import reverse
@@ -14,6 +15,7 @@ from rest_framework.test import APITestCase
 from wagtail.models import Locale, Page
 
 from home.models import HomePage
+from recipes import importer
 from recipes.models import RecipeIngredient, RecipePage
 
 User = get_user_model()
@@ -316,6 +318,32 @@ class BulkUploadTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(list(response.data["recipes"]), [1])
         self.assertFalse(RecipePage.objects.filter(slug="waffles").exists())
+
+    def test_failed_group_does_not_break_later_groups_in_same_locale(self):
+        # The French homepage has no recipes yet, so a stale in-memory numchild
+        # left behind by the rolled-back first group would crash treebeard
+        original_save = importer._save
+        calls = []
+
+        def fail_first_save(page, live, user):
+            calls.append(page.slug)
+            if len(calls) == 1:
+                raise DjangoValidationError("boom")
+            return original_save(page, live, user)
+
+        with patch.object(importer, "_save", side_effect=fail_first_save):
+            response = self.upload_json(
+                {
+                    "recipes": [
+                        {"translations": {"fr": {**FR_PANCAKES, "slug": "crepes"}}},
+                        {"translations": {"fr": {**FR_PANCAKES, "slug": "galettes"}}},
+                    ]
+                }
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(list(response.data["recipes"]), [0])
+        self.assertFalse(RecipePage.objects.filter(slug__in=calls).exists())
 
 
 class LocaleFilterTests(APITestCase):
