@@ -30,12 +30,12 @@ SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET=your-client-secret
 - **REST API**: Read-only API endpoint for HomePage content
   - Endpoint: `/api/home/`
   - Serializes title and description fields
-- **Translations**: One HomePage per content language (`en`, `de`, `fr`), linked by Wagtail's `translation_key`
+- **Translations**: One HomePage per content language (`en`, `de`, `fr`, `nl`), linked by Wagtail's `translation_key`
 
 ### Recipes (`recipes`)
 
 - **RecipePage Model**: Wagtail page with preparation, times, servings and an orderable ingredient list
-- **Multilingual Content**: Wagtail i18n (`WAGTAIL_I18N_ENABLED`) with English (default), German and French; each language version lives under its locale's HomePage
+- **Multilingual Content**: Wagtail i18n (`WAGTAIL_I18N_ENABLED`) with English (default), German, French and Dutch; each language version lives under its locale's HomePage
 - **Bulk Upload**: Create or update recipes and their translations from a JSON file, via the API or the `import_recipes` management command
 
 ## Tech Stack
@@ -115,7 +115,7 @@ Each entry groups the language versions of one recipe (max. 500 entries; a top-l
 }
 ```
 
-- Locale keys must be one of `en`, `de`, `fr`. Only `title` is required; `slug` defaults to the slugified title and `live` to `true`.
+- Locale keys must be one of `en`, `de`, `fr`, `nl`. Only `title` is required; `slug` defaults to the slugified title and `live` to `true`.
 - Recipes are matched by slug and locale: existing ones are updated (all fields and the ingredient list are replaced), new ones are created. Translations in one entry share a `translation_key`, so they appear as translations of each other in the Wagtail admin.
 - Wagtail page permissions apply: users who may not publish (the default Editors group) get draft revisions for a moderator to publish; `live` in the response shows the result.
 - The upload is all-or-nothing: on any error nothing is written and the response is `400` with errors keyed by entry index and locale.

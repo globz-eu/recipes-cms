@@ -10,6 +10,7 @@ from recipes.models import RecipePage
 
 MIGRATION = "0004_locales_and_translated_homepages"
 migration = import_module(f"home.migrations.{MIGRATION}")
+dutch_migration = import_module("home.migrations.0005_dutch_locale_and_homepage")
 
 
 class TranslatedHomepagesMigrationTests(TestCase):
@@ -25,6 +26,8 @@ class TranslatedHomepagesMigrationTests(TestCase):
     def setUp(self):
         state = MigrationExecutor(connection).loader.project_state(("home", MIGRATION))
         self.apps = state.apps
+        # Later migrations add content these tests do not expect
+        dutch_migration.remove_dutch_homepage(self.apps, None)
         migration.remove_translated_homepages(self.apps, None)
         self.locale = Locale.objects.get(language_code="en")
         self.locale.language_code = "en-us"
