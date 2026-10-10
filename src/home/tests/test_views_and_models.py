@@ -1,9 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from wagtail.models import Page
+from wagtail.models import Locale, Page
 from wagtail.test.utils import WagtailPageTestCase
 
 from home.models import HomePage
@@ -22,7 +23,8 @@ class HomeSetUpTests(WagtailPageTestCase):
 
     def test_homepage_create(self):
         root_page = Page.objects.get(pk=1)
-        homepage = HomePage(title="Home")
+        locale = Locale.objects.create(language_code="es")
+        homepage = HomePage(title="Home", locale=locale)
         root_page.add_child(instance=homepage)
         self.assertTrue(HomePage.objects.filter(title="Home").exists())
 
@@ -34,11 +36,10 @@ class HomeViewSetTests(APITestCase):
 
     def setUp(self):
         """Set up test data."""
-        root_page = Page.objects.get(pk=1)
-        self.homepage = HomePage(
-            title="Test Home", description="Test home page description"
-        )
-        root_page.add_child(instance=self.homepage)
+        # The migrations create one homepage per locale; reuse the English one
+        self.homepage = HomePage.objects.get(locale__language_code="en")
+        self.homepage.title = "Test Home"
+        self.homepage.description = "Test home page description"
         self.homepage.save()
 
         # Create users with different permissions
@@ -138,9 +139,9 @@ class HomeViewSetTests(APITestCase):
     def test_homepage_with_no_description(self):
         """Test HomePage without description field."""
         self.client.force_authenticate(user=self.editor_user)
-        root_page = Page.objects.get(pk=1)
-        homepage_no_desc = HomePage(title="Home Without Description")
-        root_page.add_child(instance=homepage_no_desc)
+        homepage_no_desc = HomePage.objects.get(locale__language_code="de")
+        homepage_no_desc.title = "Home Without Description"
+        homepage_no_desc.description = None
         homepage_no_desc.save()
 
         url = reverse("home-detail", kwargs={"pk": homepage_no_desc.pk})
@@ -149,9 +150,6 @@ class HomeViewSetTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["title"], "Home Without Description")
         self.assertIsNone(response.data["description"])
-
-        # Clean up the additional homepage
-        homepage_no_desc.delete()
 
     def test_homepage_not_found(self):
         """Test retrieving a non-existent HomePage."""
@@ -195,3 +193,20 @@ class HomeViewSetTests(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+class HomePagePerLocaleTests(WagtailPageTestCase):
+    """
+    There is exactly one homepage per locale.
+    """
+
+    def test_second_homepage_in_same_locale_is_invalid(self):
+        existing = HomePage.objects.get(locale__language_code="de")
+        duplicate = HomePage(title="Another", slug="another", locale=existing.locale)
+
+        with self.assertRaises(ValidationError):
+            Page.objects.get(pk=1).add_child(instance=duplicate)
+
+    def test_existing_homepages_are_valid(self):
+        for homepage in HomePage.objects.all():
+            homepage.clean()

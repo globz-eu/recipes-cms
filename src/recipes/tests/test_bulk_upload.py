@@ -2,6 +2,7 @@ import json
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -10,7 +11,7 @@ from django.core.management import CommandError, call_command
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from wagtail.models import Locale
+from wagtail.models import Locale, Page
 
 from home.models import HomePage
 from recipes.models import RecipeIngredient, RecipePage
@@ -86,6 +87,16 @@ class BulkUploadTests(APITestCase):
         self.client.force_authenticate(user=self.moderator_user)
         file = SimpleUploadedFile("recipes.json", content, "application/json")
         return self.client.post(URL, {"file": file}, format="multipart")
+
+    def test_multiple_homepages_in_a_locale_are_rejected(self):
+        duplicate = HomePage(title="Dup", slug="dup", locale=Locale.get_default())
+        with patch.object(HomePage, "clean"):
+            Page.objects.get(depth=1).add_child(instance=duplicate)
+
+        response = self.upload_json(pancakes(en=EN_PANCAKES))
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(RecipePage.objects.filter(slug="pancakes").exists())
 
     def test_unauthenticated(self):
         response = self.client.post(URL, pancakes(en=EN_PANCAKES), format="json")

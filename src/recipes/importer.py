@@ -151,7 +151,16 @@ def import_recipes(groups: list[dict], user=None) -> ImportResult:
         .select_related("locale")
         .order_by("path")
     ):
-        homepages.setdefault(homepage.locale.language_code, homepage)
+        if homepage.locale.language_code in homepages:
+            raise RecipeImportError(
+                {
+                    "non_field_errors": [
+                        "More than one homepage exists for locale "
+                        f"'{homepage.locale.language_code}'."
+                    ]
+                }
+            )
+        homepages[homepage.locale.language_code] = homepage
     missing = sorted(language_codes - set(homepages))
     if missing:
         raise RecipeImportError(
