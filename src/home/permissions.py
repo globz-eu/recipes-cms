@@ -1,9 +1,13 @@
 from rest_framework import permissions
+from rest_framework.exceptions import PermissionDenied
 
 
 class IsEditorOrAdmin(permissions.BasePermission):
     """
     Custom permission to only allow users who are in the Editors group or are admins.
+
+    Authenticated users without permission get a 403 with ``code: "no_access"`` so
+    clients can tell them apart from anonymous users.
     """
 
     def has_permission(self, request, view) -> bool:  # type: ignore[override]
@@ -20,4 +24,12 @@ class IsEditorOrAdmin(permissions.BasePermission):
             return True
 
         # Allow users in the Editors group
-        return request.user.groups.filter(name="Editors").exists()
+        if request.user.groups.filter(name="Editors").exists():
+            return True
+
+        raise PermissionDenied(
+            detail={
+                "detail": "Your account has no access to this content.",
+                "code": "no_access",
+            }
+        )
