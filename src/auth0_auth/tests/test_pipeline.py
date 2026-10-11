@@ -24,9 +24,9 @@ class SyncAuth0RolesTestCase(TestCase):
 
     def sync(self, roles=None, *, response=None, id_token=None, user="default"):
         backend = Mock()
-        backend.id_token = (
-            id_token if id_token is not None else ({CLAIM: roles} if roles else {})
-        )
+        if id_token is None:
+            id_token = {CLAIM: roles} if roles is not None else {}
+        backend.id_token = id_token
         return sync_auth0_roles(
             backend,
             self.user if user == "default" else user,

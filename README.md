@@ -85,7 +85,7 @@ src/
 
 ### Bulk recipe upload
 
-`POST /api/recipes/bulk-upload/` accepts either a JSON file in the multipart field `file` (max. 5 MB) or the same JSON as the request body. It requires an Editors/staff session and the `X-CSRFToken` header.
+`POST /api/recipes/bulk-upload/` accepts either a JSON file in the multipart field `file` (max. 5 MB) or the same JSON as the request body. It requires a session of an Editors/Moderators (mapped roles), staff or superuser user and the `X-CSRFToken` header.
 
 ```bash
 curl -b cookies.txt -H "X-CSRFToken: $TOKEN" -F file=@recipes.json \
@@ -147,6 +147,9 @@ SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN=your-domain.auth0.com
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY=your-client-id
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET=your-client-secret
 AUTH0_ROLES_CLAIM=https://recipes.example/roles
+# A local dev Auth0 client needs its own post-login Action (the snippet in "Auth0 roles"
+# below) using the same claim name as AUTH0_ROLES_CLAIM, with roles assigned in that
+# tenant; the Pulumi-managed Action only affects the staging client.
 
 # PostgreSQL
 POSTGRES_USER=recipes
@@ -273,7 +276,7 @@ Media files (images, documents) are stored in [Garage](https://garagehq.deuxfleu
 #### How it works
 
 - The `wagtail` container uploads files directly to Garage on port 3900 (S3 API) using `django-storages` with the `S3Boto3Storage` backend.
-- Browsers fetch media via nginx at `/media/`, which proxies to Django's `serve_media` view (`image_auth`). It checks that the user is authenticated and allowed (Editors group, staff or superuser) before streaming the object from S3.
+- Browsers fetch media via nginx at `/media/`, which proxies to Django's `serve_media` view (`image_auth`). It checks that the user is authenticated and allowed (a mapped group such as Editors or Moderators, staff or superuser) before streaming the object from S3.
 - `wagtail-storages` manages per-object ACLs so documents in private Wagtail collections are not publicly accessible.
 
 #### S3_CUSTOM_DOMAIN
@@ -375,6 +378,13 @@ exports.onExecutePostLogin = async (event, api) => {
 };
 ```
 
-Roles are synced at login, so changes apply at the user's next login. Users without a role
+Roles are synced at login, so changes apply at the user's next login. Users without a mapped role
 can log in but have no access (the API answers 403 with `code: "no_access"`). Deploy the
-Action and assign roles before deploying this version, or existing users lose access.
+Action and assign roles before deploying this version. If `AUTH0_ROLES_CLAIM` is unset,
+the Auth0 login fails with a 500; if it is set but roles are not assigned yet, users lose
+access at their next login. Practical rule: deploy the infrastructure (Action, roles, env
+var) and assign roles before bumping the CMS image.
+
+Because superuser and staff follow the `admin` role on every Auth0 login, anyone given
+superuser/staff by hand in Wagtail who logs in via Auth0 loses it at the next login unless
+they hold the `admin` role.

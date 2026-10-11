@@ -122,3 +122,22 @@ class NoAccessResponseTests(TestCase):
         response = self.client.get("/api/home/")
 
         self.assertEqual(response.status_code, 200)
+
+    def test_moderator_gets_through(self):
+        user = User.objects.create_user(username="mod", password="testpass123")
+        user.groups.add(Group.objects.get_or_create(name="Moderators")[0])
+        self.client.force_login(user)
+
+        response = self.client.get("/api/home/")
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_user_in_unmapped_group_gets_no_access_code(self):
+        user = User.objects.create_user(username="rev", password="testpass123")
+        user.groups.add(Group.objects.get_or_create(name="Reviewers")[0])
+        self.client.force_login(user)
+
+        response = self.client.get("/api/home/")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["code"], "no_access")
