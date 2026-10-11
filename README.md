@@ -11,7 +11,7 @@ A Django/Wagtail-based content management system for recipes with Auth0 authenti
   - Redirects Auth0 users to Auth0's logout endpoint
   - Falls back to standard Django logout for non-Auth0 users
   - Graceful error handling for misconfigured settings
-- **Automated User Provisioning**: New users are automatically added to the Wagtail Editors group via a social auth pipeline
+- **Role Sync**: On every login a social auth pipeline step maps the user's Auth0 roles to Wagtail groups (`editor` → Editors, `moderator` → Moderators); the `admin` role grants superuser and staff. Users without a role have no access.
 - **Comprehensive Test Suite**: Organized tests for views and pipeline functions
 
 #### Configuration
@@ -22,6 +22,7 @@ Set the following environment variables:
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN=your-domain.auth0.com
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY=your-client-id
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET=your-client-secret
+AUTH0_ROLES_CLAIM=https://recipes.example/roles
 ```
 
 ### Home (`home`)
@@ -145,6 +146,7 @@ SECRET_KEY=your-django-secret-key
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN=your-domain.auth0.com
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY=your-client-id
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET=your-client-secret
+AUTH0_ROLES_CLAIM=https://recipes.example/roles
 
 # PostgreSQL
 POSTGRES_USER=recipes
@@ -341,6 +343,7 @@ extra variables:
 | `S3_REGION_NAME` | Object storage region (`fr-par` on Scaleway, `garage` locally) |
 | `POSTGRES_SSLMODE` | libpq `sslmode` (`require` for Serverless SQL) |
 | `WAGTAILADMIN_BASE_URL` | Public base URL of the admin |
+| `AUTH0_ROLES_CLAIM` | Namespaced ID-token claim holding the user's Auth0 roles |
 
 The frontend lives in [recipes-frontend](https://github.com/globz-eu/recipes-frontend); compose serves
 `../recipes-frontend/dist` at `/frontend/`. Its build is environment-independent: deployments use a
@@ -351,9 +354,27 @@ Releases are built by CI on `v*.*.*` tags (`invoke bump`); see the infrastructur
 
 1. User navigates to `/admin/`
 2. User authenticates via Auth0
-3. On first login, the social auth pipeline:
-   - Creates a new Django user
-   - Adds the user to the "Editors" group
-   - Grants Wagtail editor permissions
+3. On every login, the social auth pipeline:
+   - Creates a new Django user if needed
+   - Reads the roles from the ID token claim named by `AUTH0_ROLES_CLAIM`
+   - Adds or removes the user's Editors / Moderators groups to match the roles
+   - Sets superuser and staff status according to the `admin` role
 4. User is redirected to the Wagtail admin interface
 5. On logout, user is redirected to Auth0's logout endpoint (if Auth0 user)
+
+### Auth0 roles
+
+Create the roles `admin`, `editor` and `moderator` in Auth0 (the recipes-infrastructure
+Pulumi program does this) and assign them to users: User Management → Users → the user →
+Roles → Assign Roles. A post-login Action must add the roles to the ID token under the
+namespace configured as `AUTH0_ROLES_CLAIM`:
+
+```js
+exports.onExecutePostLogin = async (event, api) => {
+  api.idToken.setCustomClaim("https://recipes.example/roles", event.authorization?.roles ?? []);
+};
+```
+
+Roles are synced at login, so changes apply at the user's next login. Users without a role
+can log in but have no access (the API answers 403 with `code: "no_access"`). Deploy the
+Action and assign roles before deploying this version, or existing users lose access.

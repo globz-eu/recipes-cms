@@ -1,147 +1,143 @@
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.test import TestCase
+from django.core.exceptions import ImproperlyConfigured
+from django.test import TestCase, override_settings
 
-from auth0_auth.pipeline import add_user_to_editors_group
+from auth0_auth.pipeline import sync_auth0_roles
 
 User = get_user_model()
 
+CLAIM = "https://recipes.example/roles"
 
-class AddUserToEditorsGroupPipelineTestCase(TestCase):
-    """Tests for the add_user_to_editors_group pipeline function."""
 
+@override_settings(
+    AUTH0_ROLES_CLAIM=CLAIM,
+    AUTH0_ROLE_GROUP_MAP={"editor": "Editors", "moderator": "Moderators"},
+)
+class SyncAuth0RolesTestCase(TestCase):
     def setUp(self):
-        """Set up test fixtures."""
-        self.backend = Mock()
-        self.response = {}
-        # Clean up any existing Editors group from previous tests
-        Group.objects.filter(name="Editors").delete()
-
-    def test_adds_new_user_to_editors_group(self):
-        """Test that a newly created user is added to the Editors group."""
-        user = User.objects.create_user(
-            username="newuser", email="new@example.com", password="testpass123"
+        self.user = User.objects.create_user(
+            username="user", email="user@example.com", password="testpass123"
         )
 
-        # Simulate pipeline kwargs for a new user
-        kwargs = {"is_new": True}
-
-        result = add_user_to_editors_group(self.backend, user, self.response, **kwargs)
-
-        # Verify the user was added to the Editors group
-        self.assertTrue(user.groups.filter(name="Editors").exists())
-        self.assertIsNone(result)  # Pipeline should return None
-
-    def test_creates_editors_group_if_not_exists(self):
-        """Test that the Editors group is created if it doesn't exist."""
-        # Ensure no Editors group exists
-        self.assertFalse(Group.objects.filter(name="Editors").exists())
-
-        user = User.objects.create_user(
-            username="newuser", email="new@example.com", password="testpass123"
+    def sync(self, roles=None, *, response=None, id_token=None, user="default"):
+        backend = Mock()
+        backend.id_token = (
+            id_token if id_token is not None else ({CLAIM: roles} if roles else {})
+        )
+        return sync_auth0_roles(
+            backend,
+            self.user if user == "default" else user,
+            response if response is not None else {},
+            is_new=False,
         )
 
-        kwargs = {"is_new": True}
+    def group_names(self):
+        return set(self.user.groups.values_list("name", flat=True))
 
-        add_user_to_editors_group(self.backend, user, self.response, **kwargs)
+    def test_maps_roles_to_groups(self):
+        result = self.sync(["editor", "moderator"])
 
-        # Verify the Editors group was created
-        self.assertTrue(Group.objects.filter(name="Editors").exists())
-        self.assertTrue(user.groups.filter(name="Editors").exists())
-
-    def test_does_not_add_existing_user_to_group(self):
-        """Test that existing users are not added to the Editors group."""
-        user = User.objects.create_user(
-            username="existinguser",
-            email="existing@example.com",
-            password="testpass123",
-        )
-
-        # Simulate pipeline kwargs for an existing user
-        kwargs = {"is_new": False}
-
-        result = add_user_to_editors_group(self.backend, user, self.response, **kwargs)
-
-        # Verify the user was NOT added to the Editors group
-        self.assertFalse(user.groups.filter(name="Editors").exists())
+        self.assertEqual(self.group_names(), {"Editors", "Moderators"})
         self.assertIsNone(result)
 
-    def test_does_not_add_when_is_new_not_provided(self):
-        """Test that users are not added when is_new is not in kwargs."""
-        user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
+    def test_creates_missing_groups(self):
+        Group.objects.all().delete()
 
-        # Kwargs without is_new
-        kwargs = {}
+        self.sync(["editor"])
 
-        result = add_user_to_editors_group(self.backend, user, self.response, **kwargs)
+        self.assertEqual(self.group_names(), {"Editors"})
 
-        # Verify the user was NOT added to the Editors group
-        self.assertFalse(user.groups.filter(name="Editors").exists())
-        self.assertIsNone(result)
+    def test_revoked_role_removes_group(self):
+        self.sync(["editor", "moderator"])
+
+        self.sync(["editor"])
+
+        self.assertEqual(self.group_names(), {"Editors"})
+
+    def test_no_roles_means_no_groups(self):
+        self.sync(["editor"])
+
+        self.sync([])
+
+        self.assertEqual(self.group_names(), set())
+
+    def test_leaves_unmapped_groups_alone(self):
+        other = Group.objects.create(name="Reviewers")
+        self.user.groups.add(other)
+
+        self.sync(["editor"])
+        self.sync([])
+
+        self.assertEqual(self.group_names(), {"Reviewers"})
+
+    def test_admin_role_sets_superuser_and_staff(self):
+        self.sync(["admin"])
+        self.user.refresh_from_db()
+
+        self.assertTrue(self.user.is_superuser)
+        self.assertTrue(self.user.is_staff)
+
+    def test_missing_admin_role_clears_superuser_and_staff(self):
+        self.user.is_superuser = self.user.is_staff = True
+        self.user.save()
+
+        self.sync(["editor"])
+        self.user.refresh_from_db()
+
+        self.assertFalse(self.user.is_superuser)
+        self.assertFalse(self.user.is_staff)
+
+    def test_admin_role_does_not_add_groups(self):
+        self.sync(["admin"])
+
+        self.assertEqual(self.group_names(), set())
+
+    def test_unknown_and_non_string_roles_are_ignored(self):
+        self.sync(["editor", "ghost", 7, None, {"x": 1}])
+
+        self.assertEqual(self.group_names(), {"Editors"})
+
+    def test_malformed_claim_means_no_roles(self):
+        for claim in ("editor", {"editor": True}, None, 5):
+            with self.subTest(claim=claim):
+                self.user.groups.add(Group.objects.get_or_create(name="Editors")[0])
+
+                self.sync(id_token={CLAIM: claim})
+
+                self.assertEqual(self.group_names(), set())
+
+    def test_missing_claim_means_no_roles(self):
+        self.user.groups.add(Group.objects.get_or_create(name="Editors")[0])
+
+        self.sync(id_token={"email": "user@example.com"})
+
+        self.assertEqual(self.group_names(), set())
+
+    def test_falls_back_to_response_when_id_token_has_no_claim(self):
+        self.sync(id_token={}, response={CLAIM: ["editor"]})
+
+        self.assertEqual(self.group_names(), {"Editors"})
+
+    def test_id_token_is_preferred_over_response(self):
+        self.sync(id_token={CLAIM: ["moderator"]}, response={CLAIM: ["editor"]})
+
+        self.assertEqual(self.group_names(), {"Moderators"})
+
+    def test_applies_to_existing_users_not_only_new_ones(self):
+        backend = Mock()
+        backend.id_token = {CLAIM: ["editor"]}
+
+        sync_auth0_roles(backend, self.user, {}, is_new=False)
+
+        self.assertEqual(self.group_names(), {"Editors"})
 
     def test_handles_none_user(self):
-        """Test that the function handles None user gracefully."""
-        kwargs = {"is_new": True}
+        self.assertIsNone(self.sync(["editor"], user=None))
 
-        # Should not raise an exception
-        result = add_user_to_editors_group(self.backend, None, self.response, **kwargs)
-
-        self.assertIsNone(result)
-
-    def test_uses_existing_editors_group(self):
-        """Test that the function uses an existing Editors group rather than creating a new one."""
-        # Pre-create the Editors group
-        existing_group = Group.objects.create(name="Editors")
-
-        user = User.objects.create_user(
-            username="newuser", email="new@example.com", password="testpass123"
-        )
-
-        kwargs = {"is_new": True}
-
-        add_user_to_editors_group(self.backend, user, self.response, **kwargs)
-
-        # Verify only one Editors group exists
-        self.assertEqual(Group.objects.filter(name="Editors").count(), 1)
-        # Verify the user is in the existing group
-        self.assertIn(existing_group, user.groups.all())
-
-    @patch("auth0_auth.pipeline.Group.objects.get_or_create")
-    def test_handles_exception_gracefully(self, mock_get_or_create):
-        """Test that exceptions are caught and logged."""
-        user = User.objects.create_user(
-            username="newuser", email="new@example.com", password="testpass123"
-        )
-
-        # Make get_or_create raise an exception
-        mock_get_or_create.side_effect = Exception("Database error")
-
-        kwargs = {"is_new": True}
-
-        # Should not raise an exception
-        result = add_user_to_editors_group(self.backend, user, self.response, **kwargs)
-
-        self.assertIsNone(result)
-
-    def test_user_can_be_in_multiple_groups(self):
-        """Test that adding to Editors doesn't affect other group memberships."""
-        user = User.objects.create_user(
-            username="newuser", email="new@example.com", password="testpass123"
-        )
-
-        # Add user to another group first
-        other_group, _ = Group.objects.get_or_create(name="Moderators")
-        user.groups.add(other_group)
-
-        kwargs = {"is_new": True}
-
-        add_user_to_editors_group(self.backend, user, self.response, **kwargs)
-
-        # Verify user is in both groups
-        self.assertEqual(user.groups.count(), 2)
-        self.assertTrue(user.groups.filter(name="Editors").exists())
-        self.assertTrue(user.groups.filter(name="Moderators").exists())
+    @override_settings(AUTH0_ROLES_CLAIM="")
+    def test_unconfigured_claim_fails_loudly(self):
+        with self.assertRaises(ImproperlyConfigured):
+            self.sync(["editor"])
