@@ -113,6 +113,11 @@ class BulkUploadTests(APITestCase):
         response = self.client.post(URL, pancakes(en=EN_PANCAKES), format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_moderator_can_upload(self):
+        self.client.force_authenticate(user=create_user("mod", "Moderators"))
+        response = self.client.post(URL, pancakes(en=EN_PANCAKES), format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
     def test_upload_json_body(self):
         response = self.upload_json(pancakes(en=EN_PANCAKES))
 

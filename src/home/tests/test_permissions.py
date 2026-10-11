@@ -3,6 +3,7 @@ from unittest.mock import Mock
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser, Group
 from django.test import RequestFactory, TestCase
+from rest_framework.exceptions import PermissionDenied
 
 from home.permissions import IsEditorOrAdmin
 
@@ -66,13 +67,15 @@ class IsEditorOrAdminPermissionTests(TestCase):
         has_permission = self.permission.has_permission(request, self.mock_view)
         self.assertTrue(has_permission)
 
-    def test_regular_user_no_permission(self):
-        """Test that regular users without the Editors group do not have permission."""
+    def test_regular_user_gets_no_access_error(self):
+        """Authenticated users without a role get a no_access PermissionDenied."""
         request = self.factory.get("/")
         request.user = self.regular_user
 
-        has_permission = self.permission.has_permission(request, self.mock_view)
-        self.assertFalse(has_permission)
+        with self.assertRaises(PermissionDenied) as ctx:
+            self.permission.has_permission(request, self.mock_view)
+
+        self.assertEqual(ctx.exception.detail["code"], "no_access")
 
     def test_unauthenticated_user_no_permission(self):
         """Test that unauthenticated users do not have permission."""
@@ -91,3 +94,50 @@ class IsEditorOrAdminPermissionTests(TestCase):
 
         has_permission = self.permission.has_permission(request, self.mock_view)
         self.assertFalse(has_permission)
+
+
+class NoAccessResponseTests(TestCase):
+    """The API answers authenticated users without a role with code no_access."""
+
+    def test_authenticated_user_without_role_gets_no_access_code(self):
+        user = User.objects.create_user(username="norole", password="testpass123")
+        self.client.force_login(user)
+
+        response = self.client.get("/api/home/")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["code"], "no_access")
+
+    def test_anonymous_user_does_not_get_no_access_code(self):
+        response = self.client.get("/api/home/")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn("code", response.json())
+
+    def test_editor_gets_through(self):
+        user = User.objects.create_user(username="ed", password="testpass123")
+        user.groups.add(Group.objects.get_or_create(name="Editors")[0])
+        self.client.force_login(user)
+
+        response = self.client.get("/api/home/")
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_moderator_gets_through(self):
+        user = User.objects.create_user(username="mod", password="testpass123")
+        user.groups.add(Group.objects.get_or_create(name="Moderators")[0])
+        self.client.force_login(user)
+
+        response = self.client.get("/api/home/")
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_user_in_unmapped_group_gets_no_access_code(self):
+        user = User.objects.create_user(username="rev", password="testpass123")
+        user.groups.add(Group.objects.get_or_create(name="Reviewers")[0])
+        self.client.force_login(user)
+
+        response = self.client.get("/api/home/")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["code"], "no_access")

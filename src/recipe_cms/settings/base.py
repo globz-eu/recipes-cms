@@ -148,7 +148,13 @@ SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET = os.getenv(
 )
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SCOPE = ["openid", "profile", "email", "offline_access"]
 
-# Social auth pipeline - adds custom pipeline function to add users to Editors group
+# Auth0 roles: the ID token claim holding the roles list (set by an Auth0
+# post-login Action) and the mapping from Auth0 role names to Wagtail groups.
+# The "admin" role is not mapped; it grants is_superuser and is_staff.
+AUTH0_ROLES_CLAIM = os.getenv("AUTH0_ROLES_CLAIM", "")
+AUTH0_ROLE_GROUP_MAP = {"editor": "Editors", "moderator": "Moderators"}
+
+# Social auth pipeline - includes the step that syncs Auth0 roles to groups
 SOCIAL_AUTH_PIPELINE = (
     # Get the information we can about the user and return it in a simple
     # format to create the user instance later. In some cases the details are
@@ -182,8 +188,8 @@ SOCIAL_AUTH_PIPELINE = (
     "social_core.pipeline.social_auth.load_extra_data",
     # Update the user record with any changed info from the auth service.
     "social_core.pipeline.user.user_details",
-    # Custom pipeline function to add users to the Wagtail Editors group
-    "auth0_auth.pipeline.add_user_to_editors_group",
+    # Custom pipeline function to sync Auth0 roles to Wagtail groups
+    "auth0_auth.pipeline.sync_auth0_roles",
 )
 
 # Internationalization
