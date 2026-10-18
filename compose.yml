@@ -16,12 +16,15 @@ services:
       - source: wagtail-static
         target: /usr/share/nginx/html/static
         type: volume
-      - source: ../recipes-frontend/dist
+      - source: frontend-dist
         target: /usr/share/nginx/html/frontend
-        type: bind
+        type: volume
+        read_only: true
     depends_on:
       wagtail:
         condition: service_healthy
+      frontend:
+        condition: service_completed_successfully
       s3:
         condition: service_started
     healthcheck:
@@ -31,6 +34,25 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+
+  # One-shot job: downloads the latest recipes-frontend release into the
+  # frontend-dist volume (pin with FRONTEND_VERSION, e.g. v0.5.0).
+  frontend:
+    image: curlimages/curl:8.16.0
+    user: root
+    entrypoint: ["sh", "/install.sh"]
+    environment:
+      FRONTEND_VERSION:
+      FRONTEND_FORCE:
+    volumes:
+      - source: config/frontend/install.sh
+        target: /install.sh
+        type: bind
+        read_only: true
+      - source: frontend-dist
+        target: /dist
+        type: volume
+    restart: "no"
 
   wagtail:
     build:
@@ -44,7 +66,14 @@ services:
           path: src
           target: /app
           initial_sync: true
-    command: ["uv", "run", "manage.py", "runserver", "0.0.0.0:8000"]
+    # Migrate and (re)create the local users from .env before serving.
+    command:
+      - sh
+      - -c
+      - >-
+        uv run manage.py migrate --noinput &&
+        uv run manage.py ensure_users &&
+        uv run manage.py runserver 0.0.0.0:8000
     ports:
       - target: 8000
         published: 8000
@@ -66,6 +95,15 @@ services:
       S3_ENDPOINT_URL: http://s3:3900
       S3_CUSTOM_DOMAIN:
       S3_URL_PROTOCOL:
+      DJANGO_ADMIN_USERNAME:
+      DJANGO_ADMIN_PASSWORD:
+      DJANGO_ADMIN_EMAIL:
+      DJANGO_EDITOR_USERNAME:
+      DJANGO_EDITOR_PASSWORD:
+      DJANGO_EDITOR_EMAIL:
+      DJANGO_MODERATOR_USERNAME:
+      DJANGO_MODERATOR_PASSWORD:
+      DJANGO_MODERATOR_EMAIL:
     volumes:
       - source: wagtail-static
         target: /app/static
@@ -133,6 +171,7 @@ services:
       GARAGE_RPC_SECRET:
 
 volumes:
+  frontend-dist:
   wagtail-db-data:
   wagtail-static:
   garage-meta:

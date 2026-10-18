@@ -154,6 +154,10 @@ SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SCOPE = ["openid", "profile", "email", "offline_
 AUTH0_ROLES_CLAIM = os.getenv("AUTH0_ROLES_CLAIM", "")
 AUTH0_ROLE_GROUP_MAP = {"editor": "Editors", "moderator": "Moderators"}
 
+# Username/password login endpoint for the frontend dev server. Only the dev
+# settings turn it on; it must stay off everywhere else.
+DEV_PASSWORD_LOGIN = False
+
 # Social auth pipeline - includes the step that syncs Auth0 roles to groups
 SOCIAL_AUTH_PIPELINE = (
     # Get the information we can about the user and return it in a simple
