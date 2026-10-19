@@ -34,7 +34,8 @@ COPY --chown=wagtail:wagtail .python-version .
 
 RUN mkdir recipe_cms/static
 RUN uv sync --locked --compile-bytecode
-RUN uv run manage.py collectstatic --noinput --clear
+# Build has no provider env vars, so enable only the one that needs none.
+RUN AUTH_PROVIDERS=local uv run manage.py collectstatic --noinput --clear
 
 HEALTHCHECK --interval=30s --timeout=30s --start-interval=5s --start-period=10s --retries=3 CMD ["curl", "--head", "--fail", "http://localhost:8000/health"]
 

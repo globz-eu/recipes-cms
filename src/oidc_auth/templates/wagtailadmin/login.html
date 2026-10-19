@@ -1,0 +1,9 @@
+{% extends "wagtailadmin/login.html" %}
+{% block branding_login %}Sign in to Recipes CMS{% endblock %}
+{% block above_login %}
+{% for p in social_auth_providers %}
+<p><a class="button" href="{% url 'social:begin' p.backend_name %}{% if next %}?next={{ next|urlencode:"" }}{% endif %}">Sign in with {{ p.label }}</a></p>
+{% endfor %}
+{% endblock %}
+{% block login_form %}{% if local_login_enabled %}{{ block.super }}{% endif %}{% endblock %}
+{% block submit_buttons %}{% if local_login_enabled %}{{ block.super }}{% endif %}{% endblock %}

@@ -5,7 +5,7 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase, override_settings
 
-from auth0_auth.pipeline import sync_auth0_roles
+from oidc_auth.pipeline import sync_roles
 
 User = get_user_model()
 
@@ -14,9 +14,9 @@ CLAIM = "https://recipes.example/roles"
 
 @override_settings(
     AUTH0_ROLES_CLAIM=CLAIM,
-    AUTH0_ROLE_GROUP_MAP={"editor": "Editors", "moderator": "Moderators"},
+    ROLE_GROUP_MAP={"editor": "Editors", "moderator": "Moderators"},
 )
-class SyncAuth0RolesTestCase(TestCase):
+class SyncRolesTestCase(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="user", email="user@example.com", password="testpass123"
@@ -24,10 +24,11 @@ class SyncAuth0RolesTestCase(TestCase):
 
     def sync(self, roles=None, *, response=None, id_token=None, user="default"):
         backend = Mock()
+        backend.name = "auth0_openidconnect"
         if id_token is None:
             id_token = {CLAIM: roles} if roles is not None else {}
         backend.id_token = id_token
-        return sync_auth0_roles(
+        return sync_roles(
             backend,
             self.user if user == "default" else user,
             response if response is not None else {},
@@ -128,9 +129,10 @@ class SyncAuth0RolesTestCase(TestCase):
 
     def test_applies_to_existing_users_not_only_new_ones(self):
         backend = Mock()
+        backend.name = "auth0_openidconnect"
         backend.id_token = {CLAIM: ["editor"]}
 
-        sync_auth0_roles(backend, self.user, {}, is_new=False)
+        sync_roles(backend, self.user, {}, is_new=False)
 
         self.assertEqual(self.group_names(), {"Editors"})
 
@@ -141,3 +143,70 @@ class SyncAuth0RolesTestCase(TestCase):
     def test_unconfigured_claim_fails_loudly(self):
         with self.assertRaises(ImproperlyConfigured):
             self.sync(["editor"])
+
+
+ZITADEL_CLAIM = "urn:zitadel:iam:org:project:roles"
+
+
+@override_settings(ROLE_GROUP_MAP={"editor": "Editors", "moderator": "Moderators"})
+class SyncZitadelRolesTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="zuser", email="z@example.com", password="testpass123"
+        )
+
+    def sync(self, *, response=None, id_token=None, name="zitadel"):
+        backend = Mock()
+        backend.name = name
+        backend.id_token = id_token if id_token is not None else {}
+        return sync_roles(backend, self.user, response or {}, is_new=False)
+
+    def group_names(self):
+        return set(self.user.groups.values_list("name", flat=True))
+
+    def test_object_claim_keys_are_roles(self):
+        self.sync(
+            id_token={ZITADEL_CLAIM: {"editor": {"123": "org.example"}, "ghost": {}}}
+        )
+
+        self.assertEqual(self.group_names(), {"Editors"})
+
+    def test_non_object_claims_mean_no_roles(self):
+        for claim in (["editor"], "editor", None, 5):
+            with self.subTest(claim=claim):
+                self.user.groups.add(Group.objects.get_or_create(name="Editors")[0])
+
+                self.sync(id_token={ZITADEL_CLAIM: claim})
+
+                self.assertEqual(self.group_names(), set())
+
+    def test_missing_claim_means_no_roles(self):
+        self.user.groups.add(Group.objects.get_or_create(name="Editors")[0])
+
+        self.sync(id_token={})
+
+        self.assertEqual(self.group_names(), set())
+
+    def test_falls_back_to_response(self):
+        self.sync(response={ZITADEL_CLAIM: {"moderator": {}}})
+
+        self.assertEqual(self.group_names(), {"Moderators"})
+
+    def test_id_token_is_preferred_over_response(self):
+        self.sync(
+            id_token={ZITADEL_CLAIM: {"moderator": {}}},
+            response={ZITADEL_CLAIM: {"editor": {}}},
+        )
+
+        self.assertEqual(self.group_names(), {"Moderators"})
+
+    def test_admin_role_sets_superuser_and_staff(self):
+        self.sync(id_token={ZITADEL_CLAIM: {"admin": {}}})
+        self.user.refresh_from_db()
+
+        self.assertTrue(self.user.is_superuser)
+        self.assertTrue(self.user.is_staff)
+
+    def test_unknown_backend_fails_loudly(self):
+        with self.assertRaisesMessage(ImproperlyConfigured, "github"):
+            self.sync(name="github")

@@ -7,6 +7,8 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
+from oidc_auth.ownership import social_email_owner
+
 # env prefix -> (superuser?, group name)
 ROLES = {
     "ADMIN": (True, None),
@@ -41,6 +43,11 @@ class Command(BaseCommand):
                 **{User.USERNAME_FIELD: username}
             )
             if email is not None:
+                if social_email_owner(email, exclude=user):
+                    raise CommandError(
+                        f"{role.lower()} '{username}': {email} belongs to an "
+                        "account that signs in through a social provider."
+                    )
                 user.email = email
             user.is_staff = is_superuser
             user.is_superuser = is_superuser
