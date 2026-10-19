@@ -158,8 +158,8 @@ SOCIAL_AUTH_ZITADEL_DOMAIN = os.getenv("SOCIAL_AUTH_ZITADEL_DOMAIN", None)
 SOCIAL_AUTH_ZITADEL_KEY = os.getenv("SOCIAL_AUTH_ZITADEL_KEY", None)
 SOCIAL_AUTH_ZITADEL_SECRET = os.getenv("SOCIAL_AUTH_ZITADEL_SECRET", None)
 
-# Auth0 roles: the ID token claim holding the roles list (set by an Auth0
-# post-login Action) and the mapping from Auth0 role names to Wagtail groups.
+# Auth0 roles claim (a list set by an Auth0 post-login Action) and the mapping
+# from a sign-in provider's role names to Wagtail groups.
 # The "admin" role is not mapped; it grants is_superuser and is_staff.
 AUTH0_ROLES_CLAIM = os.getenv("AUTH0_ROLES_CLAIM", "")
 ROLE_GROUP_MAP = {"editor": "Editors", "moderator": "Moderators"}
@@ -168,7 +168,7 @@ ROLE_GROUP_MAP = {"editor": "Editors", "moderator": "Moderators"}
 # settings turn it on; it must stay off everywhere else.
 DEV_PASSWORD_LOGIN = False
 
-# Social auth pipeline - includes the step that syncs Auth0 roles to groups
+# Social auth pipeline - includes the step that syncs provider roles to groups
 SOCIAL_AUTH_PIPELINE = (
     # Get the information we can about the user and return it in a simple
     # format to create the user instance later. In some cases the details are
@@ -202,8 +202,8 @@ SOCIAL_AUTH_PIPELINE = (
     "social_core.pipeline.social_auth.load_extra_data",
     # Update the user record with any changed info from the auth service.
     "social_core.pipeline.user.user_details",
-    # Custom pipeline function to sync Auth0 roles to Wagtail groups
-    "oidc_auth.pipeline.sync_auth0_roles",
+    # Custom pipeline function to sync a provider's roles to Wagtail groups
+    "oidc_auth.pipeline.sync_roles",
 )
 
 # Internationalization

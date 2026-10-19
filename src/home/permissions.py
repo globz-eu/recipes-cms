@@ -5,9 +5,9 @@ from rest_framework.exceptions import PermissionDenied
 
 class IsEditorOrAdmin(permissions.BasePermission):
     """
-    Allow admins (superuser or staff) and members of any group that an Auth0 role
-    maps to (``settings.ROLE_GROUP_MAP`` values: Editors and Moderators by
-    default).
+    Allow admins (superuser or staff) and members of any group that a sign-in
+    provider's role maps to (``settings.ROLE_GROUP_MAP`` values: Editors and
+    Moderators by default).
 
     Authenticated users without permission get a 403 with ``code: "no_access"`` so
     clients can tell them apart from anonymous users.
@@ -26,7 +26,7 @@ class IsEditorOrAdmin(permissions.BasePermission):
         if request.user.is_superuser or request.user.is_staff:
             return True
 
-        # Allow users in any group an Auth0 role maps to
+        # Allow users in any group a provider role maps to
         mapped_groups = set(settings.ROLE_GROUP_MAP.values())
         if request.user.groups.filter(name__in=mapped_groups).exists():
             return True

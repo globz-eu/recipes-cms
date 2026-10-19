@@ -1,5 +1,5 @@
 """
-Social auth pipeline functions for Auth0 authentication.
+Social auth pipeline functions shared by all sign-in providers.
 """
 
 import logging
@@ -9,6 +9,8 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured
 
+from oidc_auth.providers import provider_for_backend
+
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
 
@@ -17,29 +19,7 @@ logger = logging.getLogger(__name__)
 ADMIN_ROLE = "admin"
 
 
-def _get_roles(backend: Any, response: dict[str, Any]) -> set[str]:
-    """
-    Read the Auth0 roles claim, preferring the validated ID token over the
-    userinfo response. A missing or malformed claim means no roles.
-    """
-    claim = settings.AUTH0_ROLES_CLAIM
-    if not claim:
-        raise ImproperlyConfigured(
-            "AUTH0_ROLES_CLAIM must be set to sync Auth0 roles to Wagtail groups."
-        )
-
-    id_token = getattr(backend, "id_token", None)
-    if isinstance(id_token, dict) and claim in id_token:
-        raw = id_token[claim]
-    else:
-        raw = response.get(claim)
-
-    if not isinstance(raw, list):
-        return set()
-    return {role for role in raw if isinstance(role, str)}
-
-
-def sync_auth0_roles(
+def sync_roles(
     backend: Any,
     user: Optional["AbstractUser"],
     response: dict[str, Any],
@@ -47,7 +27,7 @@ def sync_auth0_roles(
     **kwargs: Any,
 ) -> None:
     """
-    Sync the user's Wagtail groups and superuser status with their Auth0 roles.
+    Sync the user's Wagtail groups and superuser status with the roles from their sign-in provider.
 
     Runs on every login. Only groups listed in ROLE_GROUP_MAP are added or
     removed; the ``admin`` role controls is_superuser and is_staff. A user with
@@ -56,7 +36,13 @@ def sync_auth0_roles(
     if user is None:
         return None
 
-    roles = _get_roles(backend, response)
+    provider = provider_for_backend(backend.name)
+    if provider is None:
+        raise ImproperlyConfigured(
+            f"No sign-in provider registered for backend {backend.name!r}."
+        )
+
+    roles = provider.read_roles(backend, response)
     role_map: dict[str, str] = settings.ROLE_GROUP_MAP
     managed = set(role_map.values())
     wanted = {role_map[role] for role in roles if role in role_map}
@@ -73,7 +59,8 @@ def sync_auth0_roles(
         user.save(update_fields=["is_superuser", "is_staff"])
 
     logger.info(
-        "Synced roles for %s (ID: %s): roles=%s groups=%s",
+        "Synced %s roles for %s (ID: %s): roles=%s groups=%s",
+        provider.label,
         user.username,
         user.pk,
         sorted(roles),
