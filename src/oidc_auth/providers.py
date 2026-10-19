@@ -3,9 +3,12 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlencode, urlunsplit
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.http import HttpRequest
+from social_django.models import UserSocialAuth
 
 from oidc_auth.config import AUTH0, LOCAL, ZITADEL
 
@@ -41,17 +44,61 @@ def read_zitadel_roles(backend: Any, response: dict[str, Any]) -> set[str]:
     return {role for role in raw if isinstance(role, str)}
 
 
+def auth0_logout_url(
+    request: HttpRequest, social: UserSocialAuth, return_to: str
+) -> str:
+    params = {
+        "client_id": settings.SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY,
+        "returnTo": return_to,
+    }
+    return urlunsplit(
+        (
+            "https",
+            settings.SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN,
+            "/v2/logout",
+            urlencode(params),
+            "",
+        )
+    )
+
+
+def zitadel_logout_url(
+    request: HttpRequest, social: UserSocialAuth, return_to: str
+) -> str:
+    params = {
+        "client_id": settings.SOCIAL_AUTH_ZITADEL_KEY,
+        "post_logout_redirect_uri": return_to,
+    }
+    id_token = (social.extra_data or {}).get("id_token")
+    if id_token:
+        params["id_token_hint"] = id_token
+    return urlunsplit(
+        (
+            "https",
+            settings.SOCIAL_AUTH_ZITADEL_DOMAIN,
+            "/oidc/v1/end_session",
+            urlencode(params),
+            "",
+        )
+    )
+
+
 @dataclass(frozen=True)
 class Provider:
     id: str
     backend_name: str
     label: str
     read_roles: Callable[[Any, dict[str, Any]], set[str]]
+    logout_url: Callable[[HttpRequest, UserSocialAuth, str], str]
 
 
 PROVIDERS: dict[str, Provider] = {
-    AUTH0: Provider(AUTH0, "auth0_openidconnect", "Auth0", read_auth0_roles),
-    ZITADEL: Provider(ZITADEL, "zitadel", "Zitadel", read_zitadel_roles),
+    AUTH0: Provider(
+        AUTH0, "auth0_openidconnect", "Auth0", read_auth0_roles, auth0_logout_url
+    ),
+    ZITADEL: Provider(
+        ZITADEL, "zitadel", "Zitadel", read_zitadel_roles, zitadel_logout_url
+    ),
 }
 
 

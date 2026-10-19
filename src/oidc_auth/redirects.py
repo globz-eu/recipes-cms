@@ -28,8 +28,11 @@ def safe_redirect_url(request: HttpRequest, url: str | None) -> str | None:
         url, allowed_hosts=allowed_hosts, require_https=request.is_secure()
     ):
         return url
-    parts = urlsplit(url)
-    logger.warning(
-        "Ignoring disallowed redirect to %s://%s", parts.scheme, parts.netloc
-    )
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        target = "<malformed url>"
+    else:
+        target = f"{parts.scheme}://{parts.netloc}"
+    logger.warning("Ignoring disallowed redirect to %s", target)
     return None

@@ -1,5 +1,4 @@
 import logging
-from urllib.parse import urlencode, urlunparse
 
 from django.conf import settings
 from django.contrib.auth import logout
@@ -7,6 +6,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.views import View
 
+from oidc_auth.providers import provider_for_backend
 from oidc_auth.redirects import safe_redirect_url
 
 logger = logging.getLogger(__name__)
@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 class CustomLogoutView(View):
     """
-    Custom logout view that handles both Django/Wagtail and social_auth logout.
-    For Auth0, redirects to Auth0's logout endpoint with return_to parameter.
+    Logs out of Django/Wagtail and, for users who signed in through a social
+    provider, redirects to that provider's own logout endpoint.
     """
 
     redirect_url: str | None = None
@@ -28,61 +28,22 @@ class CustomLogoutView(View):
         )
 
     def get(self, request: HttpRequest) -> HttpResponse:
-        logger.info(f"CustomLogoutView GET: Initiating logout for user: {request.user}")
-        if request.user.is_authenticated:
-            try:
-                social_auth = getattr(request.user, "social_auth", None)
-                social = social_auth.first() if social_auth else None
-                logger.info(
-                    "Social auth found: %s, provider: %s",
-                    social,
-                    social.provider if social else "N/A",
-                )
-                if social and social.provider == "auth0_openidconnect":
-                    logger.info("Auth0 user detected, performing Auth0 logout")
-                    auth0_domain = settings.SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN
-                    if not auth0_domain:
-                        raise Exception(
-                            "Auth0 settings not configured properly. Please set SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN in your settings."
-                        )
-                    return_to = request.build_absolute_uri(
-                        self.get_redirect_url(request)
-                    )
-                    params = {
-                        "client_id": getattr(
-                            settings, "SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY", ""
-                        ),
-                        "returnTo": return_to,
-                    }
-                    logout_url = urlunparse(
-                        (
-                            "https",
-                            auth0_domain,
-                            "/v2/logout",
-                            "",
-                            urlencode(params),
-                            "",
-                        )
-                    )
-                    logger.info("Logging out user from Django session")
-                    logout(request)
-                    logger.info(f"Redirecting to Auth0 logout: {logout_url}")
-                    return redirect(logout_url)
-                else:
-                    logger.info("Non-Auth0 user, performing regular logout")
-                    redirect_url = self.get_redirect_url(request)
-                    logout(request)
-                    return redirect(redirect_url)
-
-            except Exception as e:
-                logger.exception(f"Error during social auth logout: {e}")
-                logger.info("Performing regular logout")
-                redirect_url = self.get_redirect_url(request)
-                logout(request)
-                return redirect(redirect_url)
-        else:
-            logger.info("No authenticated user found, redirecting to admin login")
+        logger.info("CustomLogoutView GET: logging out user %s", request.user)
+        if not request.user.is_authenticated:
             return redirect(self.get_redirect_url(request))
+        redirect_url = self.get_redirect_url(request)
+        social = request.user.social_auth.first()
+        provider = provider_for_backend(social.provider) if social else None
+        if provider is None:
+            logger.info("No social provider for user, performing regular logout")
+            logout(request)
+            return redirect(redirect_url)
+        logout_url = provider.logout_url(
+            request, social, request.build_absolute_uri(redirect_url)
+        )
+        logout(request)
+        logger.info("Redirecting to %s logout", provider.label)
+        return redirect(logout_url)
 
     def post(self, request: HttpRequest) -> HttpResponse:
         logger.info(f"CustomLogoutView POST: request received for user: {request.user}")
