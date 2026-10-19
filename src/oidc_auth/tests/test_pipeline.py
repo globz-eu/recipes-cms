@@ -5,7 +5,7 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase, override_settings
 
-from auth0_auth.pipeline import sync_auth0_roles
+from oidc_auth.pipeline import sync_auth0_roles
 
 User = get_user_model()
 
@@ -14,7 +14,7 @@ CLAIM = "https://recipes.example/roles"
 
 @override_settings(
     AUTH0_ROLES_CLAIM=CLAIM,
-    AUTH0_ROLE_GROUP_MAP={"editor": "Editors", "moderator": "Moderators"},
+    ROLE_GROUP_MAP={"editor": "Editors", "moderator": "Moderators"},
 )
 class SyncAuth0RolesTestCase(TestCase):
     def setUp(self):

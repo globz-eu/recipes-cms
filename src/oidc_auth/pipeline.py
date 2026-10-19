@@ -49,7 +49,7 @@ def sync_auth0_roles(
     """
     Sync the user's Wagtail groups and superuser status with their Auth0 roles.
 
-    Runs on every login. Only groups listed in AUTH0_ROLE_GROUP_MAP are added or
+    Runs on every login. Only groups listed in ROLE_GROUP_MAP are added or
     removed; the ``admin`` role controls is_superuser and is_staff. A user with
     no roles ends up in no mapped group.
     """
@@ -57,7 +57,7 @@ def sync_auth0_roles(
         return None
 
     roles = _get_roles(backend, response)
-    role_map: dict[str, str] = settings.AUTH0_ROLE_GROUP_MAP
+    role_map: dict[str, str] = settings.ROLE_GROUP_MAP
     managed = set(role_map.values())
     wanted = {role_map[role] for role in roles if role in role_map}
 

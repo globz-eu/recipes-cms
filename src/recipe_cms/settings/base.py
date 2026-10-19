@@ -27,7 +27,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 
 INSTALLED_APPS = [
     "image_auth",
-    "auth0_auth",
+    "oidc_auth",
     "home",
     "recipes",
     "storages",
@@ -152,7 +152,7 @@ SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SCOPE = ["openid", "profile", "email", "offline_
 # post-login Action) and the mapping from Auth0 role names to Wagtail groups.
 # The "admin" role is not mapped; it grants is_superuser and is_staff.
 AUTH0_ROLES_CLAIM = os.getenv("AUTH0_ROLES_CLAIM", "")
-AUTH0_ROLE_GROUP_MAP = {"editor": "Editors", "moderator": "Moderators"}
+ROLE_GROUP_MAP = {"editor": "Editors", "moderator": "Moderators"}
 
 # Username/password login endpoint for the frontend dev server. Only the dev
 # settings turn it on; it must stay off everywhere else.
@@ -193,7 +193,7 @@ SOCIAL_AUTH_PIPELINE = (
     # Update the user record with any changed info from the auth service.
     "social_core.pipeline.user.user_details",
     # Custom pipeline function to sync Auth0 roles to Wagtail groups
-    "auth0_auth.pipeline.sync_auth0_roles",
+    "oidc_auth.pipeline.sync_auth0_roles",
 )
 
 # Internationalization
@@ -331,7 +331,7 @@ LOGGING = {
         },
     },
     "loggers": {
-        "auth0_auth": {
+        "oidc_auth": {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,

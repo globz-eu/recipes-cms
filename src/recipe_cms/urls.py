@@ -6,9 +6,9 @@ from wagtail import urls as wagtail_urls
 from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.documents import urls as wagtaildocs_urls
 
-from auth0_auth.views import CustomLogoutView
 from home.views import CsrfTokenView, DevLoginView, HomeViewSet
 from image_auth.views import serve_media
+from oidc_auth.views import CustomLogoutView
 from recipes.views import RecipeViewSet
 
 router = DefaultRouter()

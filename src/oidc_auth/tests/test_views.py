@@ -6,7 +6,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.test import RequestFactory, TestCase, override_settings
 
-from auth0_auth.views import CustomLogoutView
+from oidc_auth.views import CustomLogoutView
 
 User = get_user_model()
 
@@ -28,7 +28,7 @@ class CustomLogoutViewTestCase(TestCase):
         request.session.save()
         return request
 
-    @patch("auth0_auth.views.logout")
+    @patch("oidc_auth.views.logout")
     def test_regular_logout_get_request(self, mock_logout):
         """Test regular logout for non-social auth user with GET request."""
         request = self.factory.get("/admin/logout/")
@@ -41,7 +41,7 @@ class CustomLogoutViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], settings.LOGOUT_REDIRECT_URL)
 
-    @patch("auth0_auth.views.logout")
+    @patch("oidc_auth.views.logout")
     def test_regular_logout_post_request(self, mock_logout):
         """Test regular logout for non-social auth user with POST request."""
         request = self.factory.post("/admin/logout/")
@@ -54,7 +54,7 @@ class CustomLogoutViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], settings.LOGOUT_REDIRECT_URL)
 
-    @patch("auth0_auth.views.logout")
+    @patch("oidc_auth.views.logout")
     def test_anonymous_user_logout(self, mock_logout):
         """Test logout with anonymous user."""
         request = self.factory.get("/admin/logout/")
@@ -71,7 +71,7 @@ class CustomLogoutViewTestCase(TestCase):
         SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN="test-domain.auth0.com",
         SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY="test-client-id",
     )
-    @patch("auth0_auth.views.logout")
+    @patch("oidc_auth.views.logout")
     def test_auth0_logout_with_social_auth(self, mock_logout):
         """Test logout for user authenticated via Auth0."""
         request = self.factory.get("/admin/logout/")
@@ -101,7 +101,7 @@ class CustomLogoutViewTestCase(TestCase):
         SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN="test-domain.auth0.com",
         SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY="test-client-id",
     )
-    @patch("auth0_auth.views.logout")
+    @patch("oidc_auth.views.logout")
     def test_auth0_logout_post_request(self, mock_logout):
         """Test Auth0 logout with POST request."""
         request = self.factory.post("/admin/logout/")
@@ -128,7 +128,7 @@ class CustomLogoutViewTestCase(TestCase):
         SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN=None,
         SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY="test-client-id",
     )
-    @patch("auth0_auth.views.logout")
+    @patch("oidc_auth.views.logout")
     def test_auth0_logout_without_domain_configured(self, mock_logout):
         """Test logout when Auth0 domain is not configured."""
         request = self.factory.get("/admin/logout/")
@@ -152,7 +152,7 @@ class CustomLogoutViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], settings.LOGOUT_REDIRECT_URL)
 
-    @patch("auth0_auth.views.logout")
+    @patch("oidc_auth.views.logout")
     def test_social_auth_with_different_provider(self, mock_logout):
         """Test logout for user with social auth but not Auth0."""
         request = self.factory.get("/admin/logout/")
@@ -176,7 +176,7 @@ class CustomLogoutViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], settings.LOGOUT_REDIRECT_URL)
 
-    @patch("auth0_auth.views.logout")
+    @patch("oidc_auth.views.logout")
     def test_social_auth_exception_handling(self, mock_logout):
         """Test that exceptions during social auth logout are handled gracefully."""
         request = self.factory.get("/admin/logout/")
@@ -197,7 +197,7 @@ class CustomLogoutViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], settings.LOGOUT_REDIRECT_URL)
 
-    @patch("auth0_auth.views.logout")
+    @patch("oidc_auth.views.logout")
     def test_no_social_auth_attribute(self, mock_logout):
         """Test logout when user has no social_auth attribute."""
         request = self.factory.get("/admin/logout/")
@@ -211,7 +211,7 @@ class CustomLogoutViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], settings.LOGOUT_REDIRECT_URL)
 
-    @patch("auth0_auth.views.logout")
+    @patch("oidc_auth.views.logout")
     def test_relative_next_is_used(self, mock_logout):
         """A relative ?next URL on the current host is honoured."""
         request = self.factory.get("/admin/logout/", {"next": "/frontend/"})
@@ -224,7 +224,7 @@ class CustomLogoutViewTestCase(TestCase):
         self.assertEqual(response["Location"], "/frontend/")
 
     @override_settings(SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["static.example.com"])
-    @patch("auth0_auth.views.logout")
+    @patch("oidc_auth.views.logout")
     def test_absolute_next_on_allowed_host_is_used(self, mock_logout):
         """An absolute ?next URL on an allowed redirect host is honoured."""
         next_url = "http://static.example.com/frontend/"
@@ -238,7 +238,7 @@ class CustomLogoutViewTestCase(TestCase):
         self.assertEqual(response["Location"], next_url)
 
     @override_settings(SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["static.example.com"])
-    @patch("auth0_auth.views.logout")
+    @patch("oidc_auth.views.logout")
     def test_absolute_next_on_disallowed_host_is_ignored(self, mock_logout):
         """An absolute ?next URL on an unknown host falls back to the default."""
         request = self.factory.get(
@@ -257,7 +257,7 @@ class CustomLogoutViewTestCase(TestCase):
         SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY="test-client-id",
         SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["static.example.com"],
     )
-    @patch("auth0_auth.views.logout")
+    @patch("oidc_auth.views.logout")
     def test_auth0_logout_return_to_allowed_absolute_next(self, mock_logout):
         """Auth0 returnTo uses an allowed absolute ?next URL unchanged."""
         next_url = "http://static.example.com/frontend/"
