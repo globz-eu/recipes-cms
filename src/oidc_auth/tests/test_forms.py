@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.contrib.auth.models import Permission
+from django.test import TestCase
 from django.urls import reverse
 
 from oidc_auth.forms import OwnedEmailUserCreationForm, OwnedEmailUserEditForm
@@ -76,14 +77,6 @@ class EmailOwnershipFormTests(TestCase):
         self.assertNotIn("email", form.errors)
 
 
-@override_settings(
-    STORAGES={
-        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
-        },
-    }
-)
 class UsersAdminWiringTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create_superuser(
@@ -108,3 +101,35 @@ class UsersAdminWiringTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(User.objects.filter(username="newuser").exists())
+
+
+class AccountEmailManagementTests(TestCase):
+    def setUp(self):
+        self.local = User.objects.create_user(
+            username="local", email="local@example.com", password=PASSWORD
+        )
+        self.local.user_permissions.add(Permission.objects.get(codename="access_admin"))
+        self.client.force_login(self.local)
+
+    def test_account_page_does_not_offer_email_change(self):
+        response = self.client.get(reverse("wagtailadmin_account"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Name and Email")
+        self.assertNotContains(response, 'name="name_email-email"')
+
+    def test_account_page_ignores_posted_email(self):
+        social = User.objects.create_user(username="social", email="owner@example.com")
+        social.social_auth.create(provider="zitadel", uid="z-1")
+
+        self.client.post(
+            reverse("wagtailadmin_account"),
+            {
+                "name_email-first_name": "A",
+                "name_email-last_name": "B",
+                "name_email-email": "owner@example.com",
+            },
+        )
+
+        self.local.refresh_from_db()
+        self.assertEqual(self.local.email, "local@example.com")

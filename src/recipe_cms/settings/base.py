@@ -274,6 +274,10 @@ if os.environ.get("S3_CUSTOM_DOMAIN"):
     AWS_S3_CUSTOM_DOMAIN = os.environ["S3_CUSTOM_DOMAIN"]
 AWS_S3_URL_PROTOCOL = os.environ.get("S3_URL_PROTOCOL", "https:")
 
+# Emails are managed by admins or the sign-in provider; self-service changes
+# would bypass the one-email-one-provider check.
+WAGTAIL_EMAIL_MANAGEMENT_ENABLED = False
+
 # Storage settings
 # See https://docs.djangoproject.com/en/6.0/ref/settings/#std-setting-STORAGES
 STORAGES = {
