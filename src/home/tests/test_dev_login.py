@@ -65,3 +65,15 @@ class ProductionSettingsTests(TestCase):
         for name in ("base", "production"):
             module = importlib.import_module(f"recipe_cms.settings.{name}")
             self.assertFalse(getattr(module, "DEV_PASSWORD_LOGIN", False), name)
+
+    def test_importing_production_does_not_mutate_base_storages(self):
+        import importlib
+        import sys
+
+        from recipe_cms.settings import base
+
+        sys.modules.pop("recipe_cms.settings.production", None)
+        importlib.import_module("recipe_cms.settings.production")
+        self.assertNotIn(
+            "Manifest", base.STORAGES["staticfiles"]["BACKEND"], base.STORAGES
+        )
