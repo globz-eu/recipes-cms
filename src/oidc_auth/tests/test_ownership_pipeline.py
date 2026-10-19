@@ -20,13 +20,16 @@ def make_backend(id_token=None, name="zitadel"):
 
 
 class EnforceEmailOwnershipTestCase(TestCase):
-    def enforce(self, email=EMAIL, *, verified=True, id_token=None, user=None):
+    def enforce(
+        self, email=EMAIL, *, verified=True, id_token=None, user=None, social=None
+    ):
         response = {} if verified is None else {"email_verified": verified}
         return enforce_email_ownership(
             make_backend(id_token),
             {"email": email},
             response,
             user=user,
+            social=social,
         )
 
     def test_new_user_with_unique_verified_email_passes(self):
@@ -80,17 +83,30 @@ class EnforceEmailOwnershipTestCase(TestCase):
 
     def test_existing_association_with_own_email_passes(self):
         user = User.objects.create_user(username="me", email=EMAIL)
-        user.social_auth.create(provider="zitadel", uid="uid")
+        social = user.social_auth.create(provider="zitadel", uid="uid")
 
-        self.assertIsNone(self.enforce(user=user))
+        self.assertIsNone(self.enforce(user=user, social=social))
 
     def test_existing_association_with_email_of_another_user_is_refused(self):
         user = User.objects.create_user(username="me", email="me@example.com")
-        user.social_auth.create(provider="zitadel", uid="uid")
+        social = user.social_auth.create(provider="zitadel", uid="uid")
         User.objects.create_user(username="other", email=EMAIL)
 
         with self.assertRaises(EmailOwnedElsewhere):
-            self.enforce(user=user)
+            self.enforce(user=user, social=social)
+
+    def test_logged_in_local_user_with_same_email_cannot_link_provider(self):
+        user = User.objects.create_user(username="local", email=EMAIL)
+
+        with self.assertRaises(EmailOwnedElsewhere):
+            self.enforce(user=user, social=None)
+
+    def test_logged_in_user_with_other_email_cannot_link_provider(self):
+        user = User.objects.create_user(username="auth0user", email="me@example.com")
+        user.social_auth.create(provider="auth0_openidconnect", uid="auth0|1")
+
+        with self.assertRaises(EmailOwnedElsewhere):
+            self.enforce(user=user, social=None)
 
     def test_refusals_carry_code_and_message(self):
         User.objects.create_user(username="local", email=EMAIL)

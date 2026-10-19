@@ -48,7 +48,7 @@ class LoginRefusedMiddleware:
             exception.code,
         )
         messages.error(request, exception.message)
-        target = safe_redirect_url(request, request.session.get("next"))
+        target = safe_redirect_url(request, request.session.pop("next", None))
         if target:
             return HttpResponseRedirect(_with_auth_error(target, exception.code))
         return HttpResponseRedirect(reverse("wagtailadmin_login"))

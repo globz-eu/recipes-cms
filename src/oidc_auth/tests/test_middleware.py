@@ -35,6 +35,7 @@ class LoginRefusedMiddlewareTestCase(TestCase):
             "INFO:oidc_auth.middleware:Refused zitadel login: email_in_use",
             logs.output,
         )
+        self.logs = logs.output
         return response
 
     def test_safe_next_gets_auth_error_appended(self):
@@ -58,11 +59,17 @@ class LoginRefusedMiddlewareTestCase(TestCase):
         )
 
     def test_disallowed_next_redirects_to_admin_login(self):
-        request = self.make_request("https://evil.example.com/")
+        request = self.make_request("https://evil.example.com/path?token=secret")
 
         response = self.refuse(request)
 
         self.assertEqual(response["Location"], reverse("wagtailadmin_login"))
+        self.assertIn(
+            "WARNING:oidc_auth.redirects:Ignoring disallowed redirect to "
+            "https://evil.example.com",
+            self.logs,
+        )
+        self.assertNotIn("secret", "".join(self.logs))
 
     def test_absent_next_redirects_to_admin_login(self):
         request = self.make_request()
@@ -70,6 +77,13 @@ class LoginRefusedMiddlewareTestCase(TestCase):
         response = self.refuse(request)
 
         self.assertEqual(response["Location"], reverse("wagtailadmin_login"))
+
+    def test_next_is_removed_from_session(self):
+        request = self.make_request("/frontend/")
+
+        self.refuse(request)
+
+        self.assertNotIn("next", request.session)
 
     def test_message_is_stored(self):
         request = self.make_request()

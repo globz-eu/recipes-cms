@@ -1,6 +1,7 @@
 """Validation of user-supplied redirect targets."""
 
 import logging
+from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.http import HttpRequest
@@ -27,5 +28,8 @@ def safe_redirect_url(request: HttpRequest, url: str | None) -> str | None:
         url, allowed_hosts=allowed_hosts, require_https=request.is_secure()
     ):
         return url
-    logger.warning("Ignoring disallowed redirect: %s", url)
+    parts = urlsplit(url)
+    logger.warning(
+        "Ignoring disallowed redirect to %s://%s", parts.scheme, parts.netloc
+    )
     return None

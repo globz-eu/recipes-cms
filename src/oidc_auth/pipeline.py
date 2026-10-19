@@ -38,14 +38,21 @@ def enforce_email_ownership(
     """
     Refuse a social login unless its verified email belongs to no other account.
 
-    One email belongs to one sign-in method: a login is refused (never merged)
-    when the email is owned by a local user, by a user linked to another
-    provider, or by another user of the same provider. Runs right after
-    ``social_user``, so ``user`` is set only for an existing association.
+    One email belongs to one sign-in method; a login is refused, never merged.
+    Runs right after ``social_user``, which leaves three cases:
+
+    - ``user`` and ``social`` set: an existing association. Refused only if the
+      email (which ``user_details`` would copy) is owned by another user.
+    - ``user`` set but no ``social``: someone already logged in is linking a new
+      identity to their account. Always refused, whatever the email.
+    - no ``user``: a new account would be created. Refused if any user (local,
+      another provider or another uid of this provider) owns the email.
     """
     email = details.get("email") or ""
     if not email or not _is_verified(read_claim(backend, response, "email_verified")):
         raise EmailNotVerified(backend)
+    if user is not None and kwargs.get("social") is None:
+        raise EmailOwnedElsewhere(backend)
     if email_owner(email, exclude=user) is not None:
         raise EmailOwnedElsewhere(backend)
     return None
