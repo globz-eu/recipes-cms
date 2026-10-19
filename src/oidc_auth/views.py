@@ -4,9 +4,15 @@ from django.conf import settings
 from django.contrib.auth import logout
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
+from django.urls import reverse
 from django.views import View
+from rest_framework.permissions import AllowAny
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from oidc_auth.providers import provider_for_backend
+from oidc_auth.config import LOCAL
+from oidc_auth.providers import enabled_social_providers, provider_for_backend
 from oidc_auth.redirects import safe_redirect_url
 
 logger = logging.getLogger(__name__)
@@ -48,3 +54,26 @@ class CustomLogoutView(View):
     def post(self, request: HttpRequest) -> HttpResponse:
         logger.info(f"CustomLogoutView POST: request received for user: {request.user}")
         return self.get(request)
+
+
+class AuthProvidersView(APIView):
+    """Lists the enabled sign-in providers so the frontend can render buttons."""
+
+    authentication_classes: list = []
+    permission_classes = [AllowAny]
+
+    def get(self, request: Request) -> Response:
+        social = {p.id: p for p in enabled_social_providers()}
+        providers = []
+        for provider_id in settings.AUTH_PROVIDERS:
+            if provider_id == LOCAL:
+                label = "Username and password"
+                login_url = reverse("wagtailadmin_login")
+            else:
+                provider = social[provider_id]
+                label = provider.label
+                login_url = reverse("social:begin", args=[provider.backend_name])
+            providers.append(
+                {"id": provider_id, "label": label, "login_url": login_url}
+            )
+        return Response({"providers": providers})

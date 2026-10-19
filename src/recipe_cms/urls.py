@@ -8,7 +8,7 @@ from wagtail.documents import urls as wagtaildocs_urls
 
 from home.views import CsrfTokenView, DevLoginView, HomeViewSet
 from image_auth.views import serve_media
-from oidc_auth.views import CustomLogoutView
+from oidc_auth.views import AuthProvidersView, CustomLogoutView
 from recipes.views import RecipeViewSet
 
 router = DefaultRouter()
@@ -25,6 +25,11 @@ urlpatterns = [
     path("admin/", include(wagtailadmin_urls)),
     path("api/csrf/", CsrfTokenView.as_view(), name="api-csrf"),
     path("api/dev-login/", DevLoginView.as_view(), name="api-dev-login"),
+    path(
+        "api/auth/providers/",
+        AuthProvidersView.as_view(),
+        name="api-auth-providers",
+    ),
     path("api/", include(router.urls)),
     path("media/<path:image_path>", serve_media, name="serve-media"),
     path("documents/", include(wagtaildocs_urls)),
