@@ -3,7 +3,11 @@ from unittest.mock import Mock
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from oidc_auth.exceptions import EmailNotVerified, EmailOwnedElsewhere
+from oidc_auth.exceptions import (
+    AlreadySignedIn,
+    EmailNotVerified,
+    EmailOwnedElsewhere,
+)
 from oidc_auth.ownership import email_owner, social_email_owner
 from oidc_auth.pipeline import enforce_email_ownership
 
@@ -98,15 +102,22 @@ class EnforceEmailOwnershipTestCase(TestCase):
     def test_logged_in_local_user_with_same_email_cannot_link_provider(self):
         user = User.objects.create_user(username="local", email=EMAIL)
 
-        with self.assertRaises(EmailOwnedElsewhere):
+        with self.assertRaises(AlreadySignedIn):
             self.enforce(user=user, social=None)
 
     def test_logged_in_user_with_other_email_cannot_link_provider(self):
         user = User.objects.create_user(username="auth0user", email="me@example.com")
         user.social_auth.create(provider="auth0_openidconnect", uid="auth0|1")
 
-        with self.assertRaises(EmailOwnedElsewhere):
+        with self.assertRaises(AlreadySignedIn) as ctx:
             self.enforce(user=user, social=None)
+
+        self.assertEqual(ctx.exception.code, "already_signed_in")
+        self.assertEqual(
+            str(ctx.exception),
+            "You are already signed in. Sign out first to use a different "
+            "sign-in method.",
+        )
 
     def test_refusals_carry_code_and_message(self):
         User.objects.create_user(username="local", email=EMAIL)

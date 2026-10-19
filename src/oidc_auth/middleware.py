@@ -25,9 +25,9 @@ class LoginRefusedMiddleware:
     """
     Handle LoginRefused raised by the social auth pipeline.
 
-    Stores the user-facing message and redirects back to the ``next`` URL given
-    at login start (with ``auth_error=<code>`` appended) when it is safe,
-    otherwise to the Wagtail admin login page.
+    Redirects back to the ``next`` URL given at login start (with
+    ``auth_error=<code>`` appended) when it is safe. Otherwise stores the
+    user-facing message and redirects to the Wagtail admin login page.
     """
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]):
@@ -47,8 +47,8 @@ class LoginRefusedMiddleware:
             getattr(exception.backend, "name", "unknown"),
             exception.code,
         )
-        messages.error(request, exception.message)
         target = safe_redirect_url(request, request.session.pop("next", None))
         if target:
             return HttpResponseRedirect(_with_auth_error(target, exception.code))
+        messages.error(request, exception.message)
         return HttpResponseRedirect(reverse("wagtailadmin_login"))

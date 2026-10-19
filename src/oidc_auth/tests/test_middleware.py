@@ -85,7 +85,14 @@ class LoginRefusedMiddlewareTestCase(TestCase):
 
         self.assertNotIn("next", request.session)
 
-    def test_message_is_stored(self):
+    def test_message_is_not_stored_when_redirecting_to_next(self):
+        request = self.make_request("/frontend/")
+
+        self.refuse(request)
+
+        self.assertEqual(list(get_messages(request)), [])
+
+    def test_message_is_stored_on_admin_login_fallback(self):
         request = self.make_request()
 
         self.refuse(request)

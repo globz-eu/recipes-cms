@@ -9,7 +9,11 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured
 
-from oidc_auth.exceptions import EmailNotVerified, EmailOwnedElsewhere
+from oidc_auth.exceptions import (
+    AlreadySignedIn,
+    EmailNotVerified,
+    EmailOwnedElsewhere,
+)
 from oidc_auth.ownership import email_owner
 from oidc_auth.providers import provider_for_backend, read_claim
 
@@ -42,9 +46,12 @@ def enforce_email_ownership(
     Runs right after ``social_user``, which leaves three cases:
 
     - ``user`` and ``social`` set: an existing association. Refused only if the
-      email (which ``user_details`` would copy) is owned by another user.
+      email the provider reports now is owned by another user. social_core
+      protects ``email`` by default, so ``user_details`` never refreshes the
+      stored email; only this current email is checked.
     - ``user`` set but no ``social``: someone already logged in is linking a new
-      identity to their account. Always refused, whatever the email.
+      identity to their account. Always refused (``AlreadySignedIn``), whatever
+      the email.
     - no ``user``: a new account would be created. Refused if any user (local,
       another provider or another uid of this provider) owns the email.
     """
@@ -52,7 +59,7 @@ def enforce_email_ownership(
     if not email or not _is_verified(read_claim(backend, response, "email_verified")):
         raise EmailNotVerified(backend)
     if user is not None and kwargs.get("social") is None:
-        raise EmailOwnedElsewhere(backend)
+        raise AlreadySignedIn(backend)
     if email_owner(email, exclude=user) is not None:
         raise EmailOwnedElsewhere(backend)
     return None

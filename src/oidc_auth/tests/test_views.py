@@ -240,6 +240,7 @@ class CustomLogoutViewTestCase(TestCase):
     SOCIAL_AUTH_ZITADEL_KEY="zit-client",
     SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["static.example.com"],
 )
+@override_settings(AUTH_PROVIDERS=["local", "auth0", "zitadel"])
 class ProviderLogoutTestCase(TestCase):
     def logout(self, user, extra_data=None, provider="zitadel", **query):
         if provider:
@@ -301,6 +302,11 @@ class ProviderLogoutTestCase(TestCase):
 
     def test_unknown_provider_gets_plain_logout(self):
         response = self.logout(self.make_user(), provider="google-oauth2")
+        self.assertEqual(response["Location"], "/admin/")
+
+    @override_settings(AUTH_PROVIDERS=["local", "auth0"])
+    def test_disabled_provider_gets_plain_logout(self):
+        response = self.logout(self.make_user())
         self.assertEqual(response["Location"], "/admin/")
 
     def test_unauthenticated_redirects_without_error(self):

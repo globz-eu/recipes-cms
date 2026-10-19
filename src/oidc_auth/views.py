@@ -40,6 +40,8 @@ class CustomLogoutView(View):
         redirect_url = self.get_redirect_url(request)
         social = request.user.social_auth.first()
         provider = provider_for_backend(social.provider) if social else None
+        if provider is not None and provider.id not in settings.AUTH_PROVIDERS:
+            provider = None
         if provider is None:
             logger.info("No social provider for user, performing regular logout")
             logout(request)
