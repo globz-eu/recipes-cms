@@ -6,6 +6,8 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
+from oidc_auth.ownership import social_email_owner
+
 
 class Command(BaseCommand):
     help = (
@@ -39,6 +41,11 @@ class Command(BaseCommand):
         User = get_user_model()
         user, created = User.objects.get_or_create(**{User.USERNAME_FIELD: username})
         if email is not None:
+            if social_email_owner(email, exclude=user):
+                raise CommandError(
+                    f"admin '{username}': {email} belongs to an account that "
+                    "signs in through a social provider."
+                )
             user.email = email
         user.is_staff = True
         user.is_superuser = True

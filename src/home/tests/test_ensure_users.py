@@ -66,3 +66,28 @@ class EnsureUsersCommandTests(TestCase):
     def test_weak_password_is_an_error(self):
         with self.assertRaises(CommandError):
             self._call(DJANGO_EDITOR_USERNAME="editor", DJANGO_EDITOR_PASSWORD="123")
+
+    def test_refuses_email_owned_by_social_user(self):
+        social = User.objects.create_user(username="social", email="Owner@example.com")
+        social.social_auth.create(provider="zitadel", uid="z-1")
+
+        with self.assertRaisesMessage(CommandError, "editor"):
+            self._call(
+                DJANGO_EDITOR_USERNAME="editor",
+                DJANGO_EDITOR_PASSWORD=PASSWORD,
+                DJANGO_EDITOR_EMAIL="owner@example.com",
+            )
+
+        self.assertFalse(User.objects.filter(username="editor").exists())
+
+    def test_allows_email_of_the_social_user_itself(self):
+        social = User.objects.create_user(username="editor", email="owner@example.com")
+        social.social_auth.create(provider="zitadel", uid="z-1")
+
+        self._call(
+            DJANGO_EDITOR_USERNAME="editor",
+            DJANGO_EDITOR_PASSWORD=PASSWORD,
+            DJANGO_EDITOR_EMAIL="owner@example.com",
+        )
+
+        self.assertTrue(User.objects.get(username="editor").check_password(PASSWORD))

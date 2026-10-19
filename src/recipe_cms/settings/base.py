@@ -44,7 +44,7 @@ INSTALLED_APPS = [
     "wagtail.embeds",
     "wagtail.sites",
     "wagtail.locales",
-    "wagtail.users",
+    "oidc_auth.apps.CustomUsersAppConfig",
     "wagtail.snippets",
     "wagtail.documents",
     "wagtail.images",
