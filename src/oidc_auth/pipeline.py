@@ -9,7 +9,9 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured
 
-from oidc_auth.providers import provider_for_backend
+from oidc_auth.exceptions import EmailNotVerified, EmailOwnedElsewhere
+from oidc_auth.ownership import email_owner
+from oidc_auth.providers import provider_for_backend, read_claim
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -17,6 +19,36 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 ADMIN_ROLE = "admin"
+
+
+def _is_verified(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.lower() == "true"
+    return value is True
+
+
+def enforce_email_ownership(
+    backend: Any,
+    details: dict[str, Any],
+    response: dict[str, Any],
+    user: Optional["AbstractUser"] = None,
+    *args: Any,
+    **kwargs: Any,
+) -> None:
+    """
+    Refuse a social login unless its verified email belongs to no other account.
+
+    One email belongs to one sign-in method: a login is refused (never merged)
+    when the email is owned by a local user, by a user linked to another
+    provider, or by another user of the same provider. Runs right after
+    ``social_user``, so ``user`` is set only for an existing association.
+    """
+    email = details.get("email") or ""
+    if not email or not _is_verified(read_claim(backend, response, "email_verified")):
+        raise EmailNotVerified(backend)
+    if email_owner(email, exclude=user) is not None:
+        raise EmailOwnedElsewhere(backend)
+    return None
 
 
 def sync_roles(

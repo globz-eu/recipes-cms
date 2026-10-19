@@ -12,7 +12,7 @@ from oidc_auth.config import AUTH0, LOCAL, ZITADEL
 ZITADEL_ROLES_CLAIM = "urn:zitadel:iam:org:project:roles"
 
 
-def _claim(backend: Any, response: dict[str, Any], claim: str) -> Any:
+def read_claim(backend: Any, response: dict[str, Any], claim: str) -> Any:
     """Read a claim, preferring the validated ID token over the userinfo response."""
     id_token = getattr(backend, "id_token", None)
     if isinstance(id_token, dict) and claim in id_token:
@@ -27,7 +27,7 @@ def read_auth0_roles(backend: Any, response: dict[str, Any]) -> set[str]:
         raise ImproperlyConfigured(
             "AUTH0_ROLES_CLAIM must be set to sync Auth0 roles to Wagtail groups."
         )
-    raw = _claim(backend, response, claim)
+    raw = read_claim(backend, response, claim)
     if not isinstance(raw, list):
         return set()
     return {role for role in raw if isinstance(role, str)}
@@ -35,7 +35,7 @@ def read_auth0_roles(backend: Any, response: dict[str, Any]) -> set[str]:
 
 def read_zitadel_roles(backend: Any, response: dict[str, Any]) -> set[str]:
     """Zitadel roles: the keys of an object claim. Anything else means no roles."""
-    raw = _claim(backend, response, ZITADEL_ROLES_CLAIM)
+    raw = read_claim(backend, response, ZITADEL_ROLES_CLAIM)
     if not isinstance(raw, dict):
         return set()
     return {role for role in raw if isinstance(role, str)}
