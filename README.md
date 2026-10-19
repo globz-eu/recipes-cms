@@ -417,15 +417,34 @@ Releases are built by CI on `v*.*.*` tags (`invoke bump`); see the infrastructur
 
 ### Refused logins
 
-A social login is refused when the email is unverified (`email_unverified`) or already owned by
-another account or sign-in method (`email_in_use`), and also when a logged-in user tries to
-link a second provider. A refused login redirects to the `next` URL given at login start
+A social login is refused when the email is unverified (`email_unverified`), when it is already
+owned by another account or sign-in method (`email_in_use`), or when a user who is already
+signed in starts a social login (`already_signed_in`; they must sign out first). For an existing
+association the email the provider reports at each login is checked; the stored email is never
+refreshed from the provider (social-auth protects `email`). A refused login redirects to the `next` URL given at login start
 (only allowed hosts: the request host and `SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS`) with
 `auth_error=<code>` appended, so the frontend can show a message; without a safe `next` URL the user lands on the Wagtail login page with an error message.
 
 Rollout note: existing users sign in through a provider that must send `email_verified: true`.
 Auth0 and Zitadel do when the `email` scope is requested (Zitadel additionally needs
 "User Info inside ID Token", see below); a provider that does not send it locks everybody out.
+
+Before deploying, check for duplicate emails. Earlier versions did not prevent a local account
+and an Auth0 user (or two Auth0 users) from sharing an email; now such a social login is refused
+(`email_in_use`), `ensure_users` aborts with a `CommandError` (so the compose start
+`migrate && ensure_users && runserver` fails) and the `ensure_admin` job fails when
+`DJANGO_ADMIN_EMAIL` collides. Find duplicates (case-insensitive) with:
+
+```bash
+docker compose exec wagtail uv run manage.py shell -c "from django.contrib.auth import get_user_model; from django.db.models import Count; from django.db.models.functions import Lower; print(list(get_user_model().objects.annotate(e=Lower('email')).exclude(e='').values('e').annotate(n=Count('id')).filter(n__gt=1)))"
+```
+
+It must print `[]`. Otherwise change the email of, or delete, all but one account per address in
+the Wagtail admin. The local `DJANGO_*_EMAIL` values must also differ from every email of an
+identity-provider user, or the dev stack won't start.
+
+The frontend gets relative `login_url`s from `/api/auth/providers/`; because it is cross-origin
+in production it prefixes them with the API origin (it already does, via `apiUrl()`).
 
 ### Auth0 roles
 
@@ -463,7 +482,9 @@ unless they hold the `admin` role.
    scope is requested automatically.
 4. Redirect URI: `https://<host>/complete/zitadel/` (e.g. `http://localhost:8080/complete/zitadel/`
    locally). Post-logout redirect URIs: the URLs users are sent back to after logout, i.e. the
-   admin URL and the frontend URL.
+   admin URL and the frontend URL. Zitadel only accepts registered post-logout URIs (exact match),
+   so every `next` URL used for logout (admin and frontend) must be registered; otherwise Zitadel
+   shows an error page after the local logout.
 5. Set `SOCIAL_AUTH_ZITADEL_DOMAIN` (bare instance host), `SOCIAL_AUTH_ZITADEL_KEY` (client ID)
    and `SOCIAL_AUTH_ZITADEL_SECRET`, and add `zitadel` to `AUTH_PROVIDERS`.
 
