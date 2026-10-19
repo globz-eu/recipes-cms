@@ -14,6 +14,12 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
+from oidc_auth.config import (
+    authentication_backends,
+    check_provider_settings,
+    parse_auth_providers,
+)
+
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = PROJECT_DIR.parent
 
@@ -114,10 +120,10 @@ DATABASES = {
     }
 }
 
-AUTHENTICATION_BACKENDS = [
-    "social_core.backends.auth0_openidconnect.Auth0OpenIdConnectAuth",
-    "django.contrib.auth.backends.ModelBackend",
-]
+# Enabled login methods: comma-separated subset of local, auth0, zitadel. An
+# empty value (compose passes unset variables through as "") means the default.
+AUTH_PROVIDERS = parse_auth_providers(os.getenv("AUTH_PROVIDERS") or "local,auth0")
+AUTHENTICATION_BACKENDS = authentication_backends(AUTH_PROVIDERS)
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -147,6 +153,10 @@ SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET = os.getenv(
     "SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET", None
 )
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SCOPE = ["openid", "profile", "email", "offline_access"]
+
+SOCIAL_AUTH_ZITADEL_DOMAIN = os.getenv("SOCIAL_AUTH_ZITADEL_DOMAIN", None)
+SOCIAL_AUTH_ZITADEL_KEY = os.getenv("SOCIAL_AUTH_ZITADEL_KEY", None)
+SOCIAL_AUTH_ZITADEL_SECRET = os.getenv("SOCIAL_AUTH_ZITADEL_SECRET", None)
 
 # Auth0 roles: the ID token claim holding the roles list (set by an Auth0
 # post-login Action) and the mapping from Auth0 role names to Wagtail groups.
@@ -340,3 +350,6 @@ LOGGING = {
 }
 
 USE_X_FORWARDED_HOST = True
+
+# Keep last: fail at import if an enabled provider lacks its settings.
+check_provider_settings(AUTH_PROVIDERS, globals())
