@@ -14,3 +14,8 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 BASE_PATH = os.getenv("BASE_PATH", "/")
 
 USE_X_FORWARDED_PORT = True
+
+DEV_PASSWORD_LOGIN = True
+
+# The frontend dev server (Vite) proxies to this backend from another port.
+CSRF_TRUSTED_ORIGINS = ["http://localhost:5173"]

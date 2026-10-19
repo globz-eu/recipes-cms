@@ -26,10 +26,10 @@ docker compose exec wagtail uv run manage.py import_recipes recipes.json
 
 ## Architecture
 
-Django + Wagtail headless CMS: Wagtail admin for editors, DRF API under `/api/` consumed by a separate frontend (`../recipes-frontend`, served by nginx at `/frontend/` locally and cross-origin with credentials in production, hence CORS/CSRF settings and the `/api/csrf/` endpoint).
+Django + Wagtail headless CMS: Wagtail admin for editors, DRF API under `/api/` consumed by a separate frontend (`../recipes-frontend`; compose downloads its latest release via the one-shot `frontend` service and nginx serves it at `/frontend/` locally, while `npm run dev` there can use this backend through the nginx proxy; it is cross-origin with credentials in production, hence CORS/CSRF settings and the `/api/csrf/` endpoint).
 
 - **`auth0_auth`**: Auth0 OpenID Connect via social-auth; the pipeline puts new users in the Wagtail "Editors" group. Custom logout view.
-- **`home`**: `HomePage` (one per locale) is the only allowed parent of `RecipePage`. `locales.get_requested_locale` implements the `?locale=` query parameter (default `en`) shared by the API views. Also holds the `ensure_admin` command and the shared permission class.
+- **`home`**: `HomePage` (one per locale) is the only allowed parent of `RecipePage`. `locales.get_requested_locale` implements the `?locale=` query parameter (default `en`) shared by the API views. Also holds the `ensure_admin` command (deployments), the `ensure_users` command (local superuser/editor/moderator from `DJANGO_*` env vars, run by compose on start), the `/api/dev-login/` view (404 unless `DEV_PASSWORD_LOGIN`, which only `settings/dev.py` sets) and the shared permission class.
 - **`recipes`**: `RecipePage` with orderable `RecipeIngredient` children (modelcluster `ParentalKey`). Bulk upload is split across `serializers.py` (validation), `importer.py` (service, shared by the API view and the `import_recipes` command) and `views.py`.
 - **`image_auth`**: `serve_media` view; nginx proxies `/media/` to it so media is only streamed to authorized users from S3 (django-storages + wagtail-storages).
 

@@ -225,6 +225,24 @@ docker compose exec -e DJANGO_ADMIN_PASSWORD='…' wagtail \
 `--username` and `--email` default to `DJANGO_ADMIN_USERNAME` and `DJANGO_ADMIN_EMAIL`. The
 password must pass Django's password validators.
 
+#### Local users and the frontend
+
+`docker compose up` runs `migrate` and then `ensure_users`, which creates or updates a
+superuser, an Editors user and a Moderators user from `DJANGO_{ADMIN,EDITOR,MODERATOR}_{USERNAME,PASSWORD,EMAIL}`
+in `.env` (see `.env.example`). A role whose username and password are unset is skipped.
+
+A one-shot `frontend` service downloads the latest [recipes-frontend](https://github.com/globz-eu/recipes-frontend)
+release into a volume that nginx serves at http://localhost:8080/frontend/. Set `FRONTEND_VERSION`
+(e.g. `v0.5.0`) to pin a release; to re-download after a new release, run
+`docker compose run --rm -e FRONTEND_FORCE=1 frontend` (or `docker compose up frontend` once the
+latest tag changes, since the installed tag is recorded in the volume).
+
+To work on the frontend against this backend, run `npm run dev` in `../recipes-frontend`
+(http://localhost:5173/frontend/). The dev server proxies to nginx, and its login prompt offers a
+username/password form for the users above. That form posts to `/api/dev-login/`, which only exists
+when `DEV_PASSWORD_LOGIN` is true (set in `recipe_cms.settings.dev` only; it is off in production)
+and is not part of the published frontend build.
+
 ### Running Tests
 
 ```bash
@@ -348,8 +366,8 @@ extra variables:
 | `WAGTAILADMIN_BASE_URL` | Public base URL of the admin |
 | `AUTH0_ROLES_CLAIM` | Namespaced ID-token claim holding the user's Auth0 roles |
 
-The frontend lives in [recipes-frontend](https://github.com/globz-eu/recipes-frontend); compose serves
-`../recipes-frontend/dist` at `/frontend/`. Its build is environment-independent: deployments use a
+The frontend lives in [recipes-frontend](https://github.com/globz-eu/recipes-frontend); compose downloads
+its latest release and serves it at `/frontend/`. Its build is environment-independent: deployments use a
 release and write a `config.json` pointing it at the API host.
 Releases are built by CI on `v*.*.*` tags (`invoke bump`); see the infrastructure repo's README for deploying.
 

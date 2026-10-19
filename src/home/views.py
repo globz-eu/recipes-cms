@@ -1,6 +1,10 @@
+from django.conf import settings
+from django.contrib.auth import authenticate, login
+from django.http import Http404
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
+from rest_framework import status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -40,3 +44,32 @@ class CsrfTokenView(APIView):
 
     def get(self, request: Request) -> Response:
         return Response({"csrfToken": get_token(request)})
+
+
+class DevLoginView(APIView):
+    """
+    Username/password login for the frontend dev server, so local users created
+    by ``ensure_users`` can sign in without Auth0. Answers 404 unless
+    DEV_PASSWORD_LOGIN is set, which only the dev settings do.
+    """
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request: Request) -> Response:
+        if not settings.DEV_PASSWORD_LOGIN:
+            raise Http404
+        username = request.data.get("username")
+        password = request.data.get("password")
+        user = (
+            authenticate(request, username=username, password=password)
+            if isinstance(username, str) and isinstance(password, str)
+            else None
+        )
+        if user is None:
+            return Response(
+                {"detail": "Invalid username or password."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        login(request, user)
+        return Response({"username": user.get_username()})
