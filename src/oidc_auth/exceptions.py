@@ -13,6 +13,11 @@ class LoginRefused(AuthException):
         return self.message
 
 
+class EmailMissing(LoginRefused):
+    code = "email_missing"
+    message = "Your sign-in provider did not share an email address."
+
+
 class EmailNotVerified(LoginRefused):
     code = "email_unverified"
     message = "Your email address is not verified with this sign-in provider."

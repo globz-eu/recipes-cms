@@ -11,6 +11,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from oidc_auth.exceptions import (
     AlreadySignedIn,
+    EmailMissing,
     EmailNotVerified,
     EmailOwnedElsewhere,
 )
@@ -43,7 +44,9 @@ def enforce_email_ownership(
     Refuse a social login unless its verified email belongs to no other account.
 
     One email belongs to one sign-in method; a login is refused, never merged.
-    Runs right after ``social_user``, which leaves three cases:
+    Runs right after ``social_user``, which leaves three cases. The signed-in
+    check comes first; then a missing email (``EmailMissing``) and an unverified
+    one (``EmailNotVerified``) are refused in every case:
 
     - ``user`` and ``social`` set: an existing association. Refused only if the
       email the provider reports now is owned by another user. social_core
@@ -55,11 +58,13 @@ def enforce_email_ownership(
     - no ``user``: a new account would be created. Refused if any user (local,
       another provider or another uid of this provider) owns the email.
     """
-    email = details.get("email") or ""
-    if not email or not _is_verified(read_claim(backend, response, "email_verified")):
-        raise EmailNotVerified(backend)
     if user is not None and kwargs.get("social") is None:
         raise AlreadySignedIn(backend)
+    email = details.get("email") or ""
+    if not email:
+        raise EmailMissing(backend)
+    if not _is_verified(read_claim(backend, response, "email_verified")):
+        raise EmailNotVerified(backend)
     if email_owner(email, exclude=user) is not None:
         raise EmailOwnedElsewhere(backend)
     return None

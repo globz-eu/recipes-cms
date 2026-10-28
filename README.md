@@ -421,7 +421,8 @@ Releases are built by CI on `v*.*.*` tags (`invoke bump`); see the infrastructur
 
 ### Refused logins
 
-A social login is refused when the email is unverified (`email_unverified`), when it is already
+A social login is refused when the provider sends no email (`email_missing`), when the email is
+unverified (`email_unverified`), when it is already
 owned by another account or sign-in method (`email_in_use`), or when a user who is already
 signed in starts a social login (`already_signed_in`; they must sign out first). The same
 code is used when the provider identity is already linked to a different user. A cancelled or

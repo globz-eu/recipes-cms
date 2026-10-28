@@ -5,6 +5,7 @@ from django.test import TestCase
 
 from oidc_auth.exceptions import (
     AlreadySignedIn,
+    EmailMissing,
     EmailNotVerified,
     EmailOwnedElsewhere,
 )
@@ -54,9 +55,23 @@ class EnforceEmailOwnershipTestCase(TestCase):
     def test_string_true_is_accepted(self):
         self.assertIsNone(self.enforce(verified="True"))
 
-    def test_missing_email_is_refused(self):
-        with self.assertRaises(EmailNotVerified):
+    def test_missing_email_is_refused_as_missing(self):
+        with self.assertRaises(EmailMissing) as ctx:
             self.enforce(email="")
+
+        self.assertEqual(ctx.exception.code, "email_missing")
+
+    def test_signed_in_user_with_unverified_email_gets_already_signed_in(self):
+        user = User.objects.create_user(username="local", email="me@example.com")
+
+        with self.assertRaises(AlreadySignedIn):
+            self.enforce(verified=False, user=user, social=None)
+
+    def test_signed_in_user_with_missing_email_gets_already_signed_in(self):
+        user = User.objects.create_user(username="local", email="me@example.com")
+
+        with self.assertRaises(AlreadySignedIn):
+            self.enforce(email="", user=user, social=None)
 
     def test_id_token_flag_is_preferred_over_response(self):
         with self.assertRaises(EmailNotVerified):
