@@ -2,12 +2,13 @@ from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlsplit
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from django.contrib.auth import BACKEND_SESSION_KEY, get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.test import RequestFactory, TestCase, override_settings
 from social_django.models import UserSocialAuth
 
+from oidc_auth.config import AUTH0, MODEL_BACKEND, SOCIAL_BACKENDS, ZITADEL
 from oidc_auth.views import CustomLogoutView
 
 User = get_user_model()
@@ -85,6 +86,7 @@ class CustomLogoutViewTestCase(TestCase):
         mock_social.provider = "auth0_openidconnect"
         mock_social_queryset = Mock()
         mock_social_queryset.first.return_value = mock_social
+        mock_social_queryset.order_by.return_value = mock_social_queryset
         mock_social_queryset.exists.return_value = True
 
         # Patch the user's social_auth property
@@ -115,6 +117,7 @@ class CustomLogoutViewTestCase(TestCase):
         mock_social.provider = "auth0_openidconnect"
         mock_social_queryset = Mock()
         mock_social_queryset.first.return_value = mock_social
+        mock_social_queryset.order_by.return_value = mock_social_queryset
         mock_social_queryset.exists.return_value = True
 
         with patch.object(
@@ -138,6 +141,7 @@ class CustomLogoutViewTestCase(TestCase):
         mock_social.provider = "google-oauth2"
         mock_social_queryset = Mock()
         mock_social_queryset.first.return_value = mock_social
+        mock_social_queryset.order_by.return_value = mock_social_queryset
         mock_social_queryset.exists.return_value = True
 
         with patch.object(
@@ -222,6 +226,7 @@ class CustomLogoutViewTestCase(TestCase):
         mock_social.provider = "auth0_openidconnect"
         mock_social_queryset = Mock()
         mock_social_queryset.first.return_value = mock_social
+        mock_social_queryset.order_by.return_value = mock_social_queryset
 
         with patch.object(
             type(request.user), "social_auth", mock_social_queryset, create=True
@@ -295,6 +300,35 @@ class ProviderLogoutTestCase(TestCase):
         with self.assertLogs("oidc_auth.views", level="INFO") as logs:
             self.logout(self.make_user(), {"id_token": "secret.tok.en"})
         self.assertNotIn("secret.tok.en", "\n".join(logs.output))
+
+    def multi_logout_path(self, session_backend):
+        user = self.make_user("multi")
+        UserSocialAuth.objects.create(user=user, provider="zitadel", uid="z1")
+        UserSocialAuth.objects.create(
+            user=user, provider="auth0_openidconnect", uid="a1"
+        )
+        backends = [*SOCIAL_BACKENDS.values(), MODEL_BACKEND]
+        with self.settings(AUTHENTICATION_BACKENDS=backends):
+            self.client.force_login(user)
+            session = self.client.session
+            session[BACKEND_SESSION_KEY] = session_backend
+            session.save()
+            response = self.client.get("/admin/logout/")
+        return urlsplit(response["Location"]).path
+
+    def test_logout_uses_provider_of_the_session_backend(self):
+        path = self.multi_logout_path(SOCIAL_BACKENDS[ZITADEL])
+        self.assertEqual(path, "/oidc/v1/end_session")
+
+    @override_settings(SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN="auth0.example.com")
+    def test_logout_uses_auth0_when_session_backend_is_auth0(self):
+        path = self.multi_logout_path(SOCIAL_BACKENDS[AUTH0])
+        self.assertEqual(path, "/v2/logout")
+
+    @override_settings(SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN="auth0.example.com")
+    def test_logout_falls_back_to_newest_link(self):
+        path = self.multi_logout_path(MODEL_BACKEND)
+        self.assertEqual(path, "/v2/logout")
 
     def test_local_user_gets_plain_logout(self):
         response = self.logout(self.make_user("local"), provider=None)

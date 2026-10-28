@@ -1,7 +1,7 @@
 import logging
 
 from django.conf import settings
-from django.contrib.auth import logout
+from django.contrib.auth import BACKEND_SESSION_KEY, load_backend, logout
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -33,12 +33,26 @@ class CustomLogoutView(View):
             or settings.LOGOUT_REDIRECT_URL
         )
 
+    def get_social_link(self, request: HttpRequest):
+        """The social link of the session's sign-in, else the newest link."""
+        links = request.user.social_auth.order_by("-pk")
+        path = request.session.get(BACKEND_SESSION_KEY)
+        if path:
+            try:
+                name = load_backend(path).name
+            except (ImportError, AttributeError, ValueError):
+                name = None
+            link = links.filter(provider=name).first() if name else None
+            if link:
+                return link
+        return links.first()
+
     def get(self, request: HttpRequest) -> HttpResponse:
         logger.info("CustomLogoutView GET: logging out user %s", request.user)
         if not request.user.is_authenticated:
             return redirect(self.get_redirect_url(request))
         redirect_url = self.get_redirect_url(request)
-        social = request.user.social_auth.first()
+        social = self.get_social_link(request)
         provider = provider_for_backend(social.provider) if social else None
         if provider is not None and provider.id not in settings.AUTH_PROVIDERS:
             provider = None
