@@ -14,6 +14,9 @@ MANAGED_KEYS = (
     "SESSION_COOKIE_NAME",
     "CSRF_COOKIE_NAME",
 )
+HEADER = "# Local dev stack of this worktree (written by `invoke worktree-env`)"
+MIN_PORT = 1024
+MAX_PORT = 65535
 DEFAULT_NGINX_PORT = 8080
 DEFAULT_POSTGRES_PORT = 5432
 
@@ -49,11 +52,15 @@ def rewrite_env(text, name, port, db_port):
     """
     name = sanitize_name(name)
     dropped = set(MANAGED_KEYS) | set(DERIVED_KEYS)
-    kept = [line for line in text.splitlines() if _key(line) not in dropped]
+    kept = [
+        line
+        for line in text.splitlines()
+        if _key(line) not in dropped and line != HEADER
+    ]
     while kept and not kept[-1].strip():
         kept.pop()
     block = [
-        "# Local dev stack of this worktree (written by `invoke worktree-env`)",
+        HEADER,
         f"COMPOSE_PROJECT_NAME={name}",
         f"NGINX_HOST_PORT={port}",
         f"POSTGRES_HOST_PORT={db_port}",

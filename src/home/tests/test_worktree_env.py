@@ -1,6 +1,7 @@
 from django.test import SimpleTestCase
 
 from home.worktree_env import (
+    HEADER,
     default_postgres_port,
     default_project_name,
     rewrite_env,
@@ -72,11 +73,12 @@ class EdgeCaseTests(SimpleTestCase):
         self.assertIn("NGINX_HOST_PORT_EXTRA=1", out)
 
     def test_rerun_keeps_variables_unique(self):
-        # Note: the header comment is currently repeated on each run.
         once = rewrite_env(SOURCE, "x", 8081, 5433)
         twice = rewrite_env(once, "x", 8081, 5433).splitlines()
         for key in ("COMPOSE_PROJECT_NAME", "NGINX_HOST_PORT", "CSRF_COOKIE_NAME"):
             self.assertEqual(sum(line.startswith(f"{key}=") for line in twice), 1)
+        self.assertEqual(twice.count(HEADER), 1)
+        self.assertEqual("\n".join(twice) + "\n", once)
 
     def test_empty_source(self):
         out = rewrite_env("", "x", 8081, 5433)
