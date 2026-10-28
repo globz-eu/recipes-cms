@@ -10,6 +10,8 @@ from social_core.exceptions import (
     AuthAlreadyAssociated,
     AuthCanceled,
     AuthForbidden,
+    AuthStateMissing,
+    AuthTokenError,
 )
 
 from oidc_auth.exceptions import AlreadySignedIn, EmailOwnedElsewhere
@@ -130,6 +132,15 @@ class LoginRefusedMiddlewareTestCase(TestCase):
 
     def test_canceled_and_forbidden_map_to_login_failed(self):
         for exception in (AuthCanceled(Mock()), AuthForbidden(Mock())):
+            with self.subTest(exception=type(exception).__name__):
+                request, response = self.handle(exception)
+
+                self.assertEqual(
+                    response["Location"], "/frontend/?auth_error=login_failed"
+                )
+
+    def test_other_auth_exceptions_map_to_login_failed(self):
+        for exception in (AuthStateMissing(Mock()), AuthTokenError(Mock())):
             with self.subTest(exception=type(exception).__name__):
                 request, response = self.handle(exception)
 

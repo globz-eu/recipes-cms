@@ -7,7 +7,10 @@ from urllib.parse import urlencode, urlsplit, urlunsplit
 from django.contrib import messages
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.urls import reverse
-from social_core.exceptions import AuthAlreadyAssociated, AuthCanceled, AuthForbidden
+from social_core.exceptions import (
+    AuthAlreadyAssociated,
+    AuthException,
+)
 
 from oidc_auth.exceptions import AlreadySignedIn, LoginRefused
 from oidc_auth.redirects import safe_redirect_url
@@ -25,7 +28,7 @@ def _refusal(exception: Exception) -> tuple[str, str] | None:
         return exception.code, exception.message
     if isinstance(exception, AuthAlreadyAssociated):
         return AlreadySignedIn.code, AlreadySignedIn.message
-    if isinstance(exception, AuthCanceled | AuthForbidden):
+    if isinstance(exception, AuthException):
         return LOGIN_FAILED_CODE, LOGIN_FAILED_MESSAGE
     return None
 
@@ -42,8 +45,9 @@ class LoginRefusedMiddleware:
     Handle LoginRefused and other social-auth login failures.
 
     Besides our own LoginRefused this covers AuthAlreadyAssociated (the identity
-    belongs to another user, reported as ``already_signed_in``) and AuthCanceled /
-    AuthForbidden (reported as the generic ``login_failed``).
+    belongs to another user, reported as ``already_signed_in``) and every other
+    AuthException such as AuthCanceled, AuthForbidden, a lost state or a token
+    error (reported as the generic ``login_failed``).
 
     Redirects back to the ``next`` URL given at login start (with
     ``auth_error=<code>`` appended) when it is safe. Otherwise stores the

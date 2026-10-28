@@ -425,8 +425,9 @@ A social login is refused when the provider sends no email (`email_missing`), wh
 unverified (`email_unverified`), when it is already
 owned by another account or sign-in method (`email_in_use`), or when a user who is already
 signed in starts a social login (`already_signed_in`; they must sign out first). The same
-code is used when the provider identity is already linked to a different user. A cancelled or
-forbidden provider login (for example the user denies consent) gives the generic `login_failed`. For an existing
+code is used when the provider identity is already linked to a different user. Any other failed provider
+login (cancelled or forbidden, for example the user denies consent, a lost login state or
+a token error) gives the generic `login_failed`. For an existing
 association the email the provider reports at each login is checked; the stored email is never
 refreshed from the provider (social-auth protects `email`). A refused login redirects to the `next` URL given at login start
 (only allowed hosts: the request host and `SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS`) with
