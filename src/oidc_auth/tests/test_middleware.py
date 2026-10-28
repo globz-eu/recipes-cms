@@ -6,9 +6,14 @@ from django.contrib.sessions.middleware import SessionMiddleware
 from django.http import HttpResponse
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
+from social_core.exceptions import (
+    AuthAlreadyAssociated,
+    AuthCanceled,
+    AuthForbidden,
+)
 
-from oidc_auth.exceptions import EmailOwnedElsewhere
-from oidc_auth.middleware import LoginRefusedMiddleware
+from oidc_auth.exceptions import AlreadySignedIn, EmailOwnedElsewhere
+from oidc_auth.middleware import LOGIN_FAILED_MESSAGE, LoginRefusedMiddleware
 
 
 @override_settings(SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["app.example.com"])
@@ -99,6 +104,45 @@ class LoginRefusedMiddlewareTestCase(TestCase):
 
         self.assertEqual(
             [m.message for m in get_messages(request)], [EmailOwnedElsewhere.message]
+        )
+
+    def handle(self, exception, next_url="/frontend/"):
+        request = self.make_request(next_url)
+        return request, self.middleware.process_exception(request, exception)
+
+    def test_already_associated_maps_to_already_signed_in(self):
+        backend = Mock()
+        backend.name = "zitadel"
+
+        request, response = self.handle(AuthAlreadyAssociated(backend))
+
+        self.assertEqual(
+            response["Location"], "/frontend/?auth_error=already_signed_in"
+        )
+
+    def test_already_associated_message_on_admin_login_fallback(self):
+        request, response = self.handle(AuthAlreadyAssociated(Mock()), next_url=None)
+
+        self.assertEqual(response["Location"], reverse("wagtailadmin_login"))
+        self.assertEqual(
+            [m.message for m in get_messages(request)], [AlreadySignedIn.message]
+        )
+
+    def test_canceled_and_forbidden_map_to_login_failed(self):
+        for exception in (AuthCanceled(Mock()), AuthForbidden(Mock())):
+            with self.subTest(exception=type(exception).__name__):
+                request, response = self.handle(exception)
+
+                self.assertEqual(
+                    response["Location"], "/frontend/?auth_error=login_failed"
+                )
+
+    def test_login_failed_message_on_admin_login_fallback(self):
+        request, response = self.handle(AuthCanceled(Mock()), next_url=None)
+
+        self.assertEqual(response["Location"], reverse("wagtailadmin_login"))
+        self.assertEqual(
+            [m.message for m in get_messages(request)], [LOGIN_FAILED_MESSAGE]
         )
 
     def test_other_exceptions_fall_through(self):

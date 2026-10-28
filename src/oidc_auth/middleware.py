@@ -7,11 +7,27 @@ from urllib.parse import urlencode, urlsplit, urlunsplit
 from django.contrib import messages
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.urls import reverse
+from social_core.exceptions import AuthAlreadyAssociated, AuthCanceled, AuthForbidden
 
-from oidc_auth.exceptions import LoginRefused
+from oidc_auth.exceptions import AlreadySignedIn, LoginRefused
 from oidc_auth.redirects import safe_redirect_url
 
 logger = logging.getLogger(__name__)
+
+
+LOGIN_FAILED_CODE = "login_failed"
+LOGIN_FAILED_MESSAGE = "Sign-in failed. Please try again."
+
+
+def _refusal(exception: Exception) -> tuple[str, str] | None:
+    """Return (code, message) for exceptions that end a social login, else None."""
+    if isinstance(exception, LoginRefused):
+        return exception.code, exception.message
+    if isinstance(exception, AuthAlreadyAssociated):
+        return AlreadySignedIn.code, AlreadySignedIn.message
+    if isinstance(exception, AuthCanceled | AuthForbidden):
+        return LOGIN_FAILED_CODE, LOGIN_FAILED_MESSAGE
+    return None
 
 
 def _with_auth_error(url: str, code: str) -> str:
@@ -23,7 +39,11 @@ def _with_auth_error(url: str, code: str) -> str:
 
 class LoginRefusedMiddleware:
     """
-    Handle LoginRefused raised by the social auth pipeline.
+    Handle LoginRefused and other social-auth login failures.
+
+    Besides our own LoginRefused this covers AuthAlreadyAssociated (the identity
+    belongs to another user, reported as ``already_signed_in``) and AuthCanceled /
+    AuthForbidden (reported as the generic ``login_failed``).
 
     Redirects back to the ``next`` URL given at login start (with
     ``auth_error=<code>`` appended) when it is safe. Otherwise stores the
@@ -39,16 +59,18 @@ class LoginRefusedMiddleware:
     def process_exception(
         self, request: HttpRequest, exception: Exception
     ) -> HttpResponse | None:
-        if not isinstance(exception, LoginRefused):
+        refusal = _refusal(exception)
+        if refusal is None:
             return None
+        code, message = refusal
 
         logger.info(
             "Refused %s login: %s",
-            getattr(exception.backend, "name", "unknown"),
-            exception.code,
+            getattr(getattr(exception, "backend", None), "name", "unknown"),
+            code,
         )
         target = safe_redirect_url(request, request.session.pop("next", None))
         if target:
-            return HttpResponseRedirect(_with_auth_error(target, exception.code))
-        messages.error(request, exception.message)
+            return HttpResponseRedirect(_with_auth_error(target, code))
+        messages.error(request, message)
         return HttpResponseRedirect(reverse("wagtailadmin_login"))
