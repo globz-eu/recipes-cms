@@ -36,25 +36,33 @@ SOCIAL_AUTH_REDIRECT_IS_HTTPS = True
 # outdated JavaScript / CSS assets being served from cache
 # (e.g. after a Wagtail upgrade).
 # See https://docs.djangoproject.com/en/6.0/ref/contrib/staticfiles/#manifeststaticfilesstorage
-STORAGES["staticfiles"]["BACKEND"] = (  # noqa: F405
-    "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
-)
+# Build a new dict: STORAGES is shared with the base module, which must not change.
+STORAGES = {  # noqa: F405
+    **STORAGES,  # noqa: F405
+    "staticfiles": {
+        **STORAGES["staticfiles"],  # noqa: F405
+        "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
+    },
+}
 
 # When a static bucket is configured, static files are collected to S3 and
 # served from a CDN domain instead of the local filesystem.
 STATIC_BUCKET_NAME = os.getenv("STATIC_BUCKET_NAME")
 STATIC_CUSTOM_DOMAIN = os.getenv("STATIC_CUSTOM_DOMAIN")
 if STATIC_BUCKET_NAME:
-    STORAGES["staticfiles"] = {  # noqa: F405
-        "BACKEND": "storages.backends.s3.S3ManifestStaticStorage",
-        "OPTIONS": {
-            "bucket_name": STATIC_BUCKET_NAME,
-            "location": "static",
-            "custom_domain": STATIC_CUSTOM_DOMAIN,
-            "querystring_auth": False,
-            # Served publicly by the CDN (bucket website endpoint).
-            "default_acl": "public-read",
-            "file_overwrite": True,
+    STORAGES = {
+        **STORAGES,
+        "staticfiles": {
+            "BACKEND": "storages.backends.s3.S3ManifestStaticStorage",
+            "OPTIONS": {
+                "bucket_name": STATIC_BUCKET_NAME,
+                "location": "static",
+                "custom_domain": STATIC_CUSTOM_DOMAIN,
+                "querystring_auth": False,
+                # Served publicly by the CDN (bucket website endpoint).
+                "default_acl": "public-read",
+                "file_overwrite": True,
+            },
         },
     }
     if STATIC_CUSTOM_DOMAIN:

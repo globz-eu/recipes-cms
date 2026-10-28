@@ -81,3 +81,31 @@ class EnsureAdminCommandTests(TestCase):
             self._call("--username", "admin", password="123")
 
         self.assertFalse(User.objects.filter(username="admin").exists())
+
+    def test_refuses_email_owned_by_social_user(self):
+        social = User.objects.create_user(username="social", email="Owner@example.com")
+        social.social_auth.create(provider="zitadel", uid="z-1")
+
+        with self.assertRaisesMessage(CommandError, "owner@example.com"):
+            self._call("--username", "admin", "--email", "owner@example.com")
+
+        self.assertFalse(User.objects.filter(username="admin").exists())
+
+    def test_refuses_email_of_another_local_user(self):
+        User.objects.create_user(username="local", email="Shared@example.com")
+
+        with self.assertRaisesMessage(CommandError, "another user ('local')"):
+            self._call("--username", "admin", "--email", "shared@example.com")
+
+        self.assertFalse(User.objects.filter(username="admin").exists())
+
+    def test_refuses_username_of_social_user(self):
+        social = User.objects.create_user(username="admin", email="owner@example.com")
+        social.social_auth.create(provider="zitadel", uid="z-1")
+
+        with self.assertRaisesMessage(CommandError, "social provider"):
+            self._call("--username", "admin", "--email", "owner@example.com")
+
+        social.refresh_from_db()
+        self.assertFalse(social.is_superuser)
+        self.assertFalse(social.has_usable_password())

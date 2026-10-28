@@ -1,28 +1,42 @@
 # Recipes CMS
 
-A Django/Wagtail-based content management system for recipes with Auth0 authentication and REST API support.
+A Django/Wagtail-based content management system for recipes with pluggable authentication (local accounts, Auth0, Zitadel) and REST API support.
 
 ## Features
 
-### Authentication (`auth0_auth`)
+### Authentication (`oidc_auth`)
 
-- **Auth0 Integration**: OAuth2/OpenID Connect authentication via Auth0
-- **Custom Logout View**: Handles both Django and Auth0 logout flows
-  - Redirects Auth0 users to Auth0's logout endpoint
-  - Falls back to standard Django logout for non-Auth0 users
-  - Graceful error handling for misconfigured settings
-- **Role Sync**: On every login a social auth pipeline step maps the user's Auth0 roles to Wagtail groups (`editor` → Editors, `moderator` → Moderators); the `admin` role grants superuser and staff. Users without a role have no access.
-- **Comprehensive Test Suite**: Organized tests for views and pipeline functions
+Sign-in methods are pluggable. `AUTH_PROVIDERS` is a comma-separated subset of `local`
+(username/password), `auth0` and `zitadel` (case-insensitive, duplicates dropped, default
+`local,auth0`). An empty or unknown entry, or an enabled provider with missing variables,
+stops the app at startup with an `ImproperlyConfigured` error naming every missing variable;
+disabled providers need none.
+
+- **Providers**: Auth0 and Zitadel via OpenID Connect (social-auth), plus local Django accounts. The Wagtail login page and the DRF login page show a button per enabled provider. `GET /api/auth/providers/` returns the enabled methods (`id`, `label`, `login_url`) so the frontend can render its own buttons.
+- **One email, one provider**: a social login is refused, never merged, when the provider does not report `email_verified: true`, or when the email already belongs to a local user, to a user linked to another provider, or to another user of the same provider (compared case-insensitively). A user who is already logged in cannot link a second provider either. A unique database index on the lower-cased email (blank emails excepted, migration `oidc_auth.0001`) enforces this even for simultaneous first logins; the login that loses the race is refused as `email_in_use`.
+- **Role sync**: on every login the user's provider roles are mapped to Wagtail groups (`ROLE_GROUP_MAP`: `editor` → Editors, `moderator` → Moderators); the `admin` role grants superuser and staff. Users without a role have no access. Roles are read from the ID token (falling back to the userinfo response): a list under `AUTH0_ROLES_CLAIM` for Auth0, the keys of the `urn:zitadel:iam:org:project:roles` object for Zitadel.
+- **Logout**: the custom logout view logs out of Django and then of the user's own provider (Auth0 `/v2/logout`, Zitadel `/oidc/v1/end_session`); local users get a plain Django logout.
+- **Local accounts**: when `local` is disabled, password login is off. Permissions keep working through a permissions-only backend. Local accounts have no 2FA, so disable `local` wherever 2FA is required and let the identity provider enforce it.
+- **Emails**: `WAGTAIL_EMAIL_MANAGEMENT_ENABLED = False`, so users cannot change their own email in the Wagtail account page; administrators (or the identity provider) manage emails. The Wagtail user forms and the `ensure_users` / `ensure_admin` commands refuse an email that already belongs to another user (social or local, case-insensitively), and the Wagtail user edit form offers no password fields for a social user.
+- **Comprehensive Test Suite**: Organized tests for configuration, pipeline, middleware, forms, views and login pages
 
 #### Configuration
 
-Set the following environment variables:
+Set `AUTH_PROVIDERS` and the variables of each enabled provider:
 
 ```bash
+AUTH_PROVIDERS=local,auth0,zitadel
+
+# auth0
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN=your-domain.auth0.com
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY=your-client-id
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET=your-client-secret
 AUTH0_ROLES_CLAIM=https://recipes.example/roles
+
+# zitadel (bare instance host, no scheme)
+SOCIAL_AUTH_ZITADEL_DOMAIN=your-instance.zitadel.cloud
+SOCIAL_AUTH_ZITADEL_KEY=your-client-id
+SOCIAL_AUTH_ZITADEL_SECRET=your-client-secret
 ```
 
 ### Home (`home`)
@@ -52,12 +66,17 @@ AUTH0_ROLES_CLAIM=https://recipes.example/roles
 
 ```
 src/
-├── auth0_auth/          # Auth0 authentication app
+├── oidc_auth/           # Pluggable authentication app (local, Auth0, Zitadel)
 │   ├── tests/          # Organized test suite
-│   │   ├── test_views.py      # View tests
-│   │   └── test_pipeline.py   # Pipeline function tests
-│   ├── pipeline.py     # Social auth pipeline functions
-│   └── views.py        # Custom logout view
+│   ├── config.py       # AUTH_PROVIDERS parsing and startup checks
+│   ├── backends.py     # Zitadel and permissions-only backends
+│   ├── providers.py    # Provider registry: role readers, logout URLs
+│   ├── pipeline.py     # Email ownership check and role sync
+│   ├── middleware.py   # Turns refused logins into a redirect with a message
+│   ├── ownership.py    # Email owner lookup (pipeline, forms, commands)
+│   ├── redirects.py    # Safe redirect target validation
+│   ├── forms.py        # Email checks for Wagtail user forms
+│   └── views.py        # Per-provider logout, /api/auth/providers/
 ├── home/               # Home page app
 │   ├── models.py       # HomePage model
 │   ├── views.py        # API viewsets
@@ -79,9 +98,10 @@ src/
 - `/api/home/` - HomePage content (GET); filter with `?locale=de` (default: `en`)
 - `/api/recipes/` - Published recipes (GET); without `?locale=` returns all recipes grouped by locale as `{"locales": {"en": [...], "de": [...]}}`, with `?locale=de` returns a flat list for that locale. Detail (`/api/recipes/<id>/`) works for any locale. Each recipe includes `locale` and `translation_key`
 - `/api/recipes/bulk-upload/` - Bulk create/update recipes (POST, see below)
+- `/api/auth/providers/` - Enabled sign-in methods (GET, no authentication): `{"providers": [{"id", "label", "login_url"}]}`
 - `/api/csrf/` - Returns a CSRF token (`{"csrfToken": ...}`) for cross-origin clients; send it back as `X-CSRFToken` on unsafe requests
 - `/admin/` - Wagtail admin interface (requires authentication)
-- `/admin/logout/` - Custom logout endpoint
+- `/admin/logout/` - Custom logout endpoint (also logs out of the user's sign-in provider)
 
 ### Bulk recipe upload
 
@@ -142,6 +162,10 @@ Create a `.env` file in the project root with the following variables:
 ```bash
 SECRET_KEY=your-django-secret-key
 
+# Sign-in methods: comma-separated subset of local, auth0, zitadel (default local,auth0).
+# Each enabled provider's variables are required at startup; see "Authentication".
+AUTH_PROVIDERS=local,auth0
+
 # Auth0
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN=your-domain.auth0.com
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY=your-client-id
@@ -150,6 +174,13 @@ AUTH0_ROLES_CLAIM=https://recipes.example/roles
 # A local dev Auth0 client needs its own post-login Action (the snippet in "Auth0 roles"
 # below) using the same claim name as AUTH0_ROLES_CLAIM, with roles assigned in that
 # tenant; the Pulumi-managed Action only affects the staging client.
+
+# Zitadel (only needed when AUTH_PROVIDERS contains zitadel)
+# SOCIAL_AUTH_ZITADEL_DOMAIN=your-instance.zitadel.cloud
+# SOCIAL_AUTH_ZITADEL_KEY=your-client-id
+# SOCIAL_AUTH_ZITADEL_SECRET=your-client-secret
+# Optional: only trust roles granted in this Zitadel organisation id
+# ZITADEL_ROLE_ORG_ID=
 
 # PostgreSQL
 POSTGRES_USER=recipes
@@ -214,8 +245,10 @@ docker compose exec wagtail uv run manage.py collectstatic
 
 `ensure_admin` creates a superuser, or updates an existing user with that username to be an
 active superuser with the given password (and email, if given). It is idempotent, so it can
-run on every deploy. The password is read only from `DJANGO_ADMIN_PASSWORD`, so it never
-shows up in the process list or shell history:
+run on every deploy. It aborts with a `CommandError` if the username belongs to a user who
+signs in through a social provider (such a user is never given a password). The password
+is read only from `DJANGO_ADMIN_PASSWORD`, so it never shows up in the process list or
+shell history:
 
 ```bash
 docker compose exec -e DJANGO_ADMIN_PASSWORD='…' wagtail \
@@ -249,8 +282,8 @@ and is not part of the published frontend build.
 # Run all tests
 docker compose exec wagtail uv run manage.py test
 
-# Run auth0_auth tests
-docker compose exec wagtail uv run manage.py test auth0_auth
+# Run oidc_auth tests
+docker compose exec wagtail uv run manage.py test oidc_auth
 
 # Run home tests
 docker compose exec wagtail uv run manage.py test home
@@ -364,7 +397,11 @@ extra variables:
 | `S3_REGION_NAME` | Object storage region (`fr-par` on Scaleway, `garage` locally) |
 | `POSTGRES_SSLMODE` | libpq `sslmode` (`require` for Serverless SQL) |
 | `WAGTAILADMIN_BASE_URL` | Public base URL of the admin |
-| `AUTH0_ROLES_CLAIM` | Namespaced ID-token claim holding the user's Auth0 roles |
+| `AUTH_PROVIDERS` | Enabled sign-in methods, subset of `local`, `auth0`, `zitadel` (default `local,auth0`) |
+| `SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN`, `_KEY`, `_SECRET` | Auth0 application; required when `auth0` is enabled |
+| `AUTH0_ROLES_CLAIM` | Namespaced ID-token claim holding the user's Auth0 roles; required when `auth0` is enabled |
+| `SOCIAL_AUTH_ZITADEL_DOMAIN`, `SOCIAL_AUTH_ZITADEL_KEY`, `SOCIAL_AUTH_ZITADEL_SECRET` | Zitadel instance host (no scheme), client ID and secret; required when `zitadel` is enabled |
+| `ZITADEL_ROLE_ORG_ID` | Optional Zitadel organisation id; when set, only roles granted in that organisation are trusted (see Zitadel setup) |
 
 The frontend lives in [recipes-frontend](https://github.com/globz-eu/recipes-frontend); compose downloads
 its latest release and serves it at `/frontend/`. Its build is environment-independent: deployments use a
@@ -373,15 +410,56 @@ Releases are built by CI on `v*.*.*` tags (`invoke bump`); see the infrastructur
 
 ## Authentication Flow
 
-1. User navigates to `/admin/`
-2. User authenticates via Auth0
-3. On every login, the social auth pipeline:
+1. User navigates to `/admin/` and picks an enabled sign-in method (or the frontend starts the login at a `login_url` from `/api/auth/providers/`)
+2. Social login: the user authenticates at Auth0 or Zitadel and returns to `/complete/<backend>/`. The social auth pipeline then:
+   - Refuses the login unless the provider reports a verified email that belongs to no other account (see below)
    - Creates a new Django user if needed
-   - Reads the roles from the ID token claim named by `AUTH0_ROLES_CLAIM`
+   - Reads the roles from the ID token (Auth0: the claim named by `AUTH0_ROLES_CLAIM`; Zitadel: `urn:zitadel:iam:org:project:roles`)
    - Adds or removes the user's Editors / Moderators groups to match the roles
    - Sets superuser and staff status according to the `admin` role
-4. User is redirected to the Wagtail admin interface
-5. On logout, user is redirected to Auth0's logout endpoint (if Auth0 user)
+3. User is redirected to the Wagtail admin interface (or back to the `next` URL)
+4. On logout, social users are redirected to their provider's logout endpoint; local users are logged out of Django only
+
+### Refused logins
+
+A social login is refused when the provider sends no email (`email_missing`), when the
+email is unverified (`email_unverified`), when it is already owned by another account or
+sign-in method (`email_in_use`), or when a user who is already signed in starts a social
+login (`already_signed_in`; they must sign out first). The same code is used when the
+provider identity is already linked to a different user. Any other failed provider login
+(cancelled or forbidden, for example the user denies consent, a lost login state or a
+token error) gives the generic `login_failed`. For an existing association the email the
+provider reports at each login is checked; the stored email is never refreshed from the
+provider (social-auth protects `email`). A refused login redirects to the `next` URL
+given at login start (only allowed hosts: the request host and
+`SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS`) with `auth_error=<code>` appended, so the frontend
+can show a message; without a safe `next` URL the user lands on the Wagtail login page
+with an error message.
+
+Rollout note: existing users sign in through a provider that must send `email_verified: true`.
+Auth0 and Zitadel do when the `email` scope is requested (Zitadel additionally needs
+"User Info inside ID Token", see below); a provider that does not send it locks everybody out.
+
+Before deploying, check for duplicate emails. Earlier versions did not prevent two accounts
+(local or Auth0) from sharing an email. Migration `oidc_auth.0001` adds a unique index on the
+lower-cased email and fails while duplicates exist, so `migrate` (and with it the deployment)
+stops until they are cleaned up; run it only after the cleanup. Afterwards `ensure_users` aborts
+with a `CommandError` (so the compose start `migrate && ensure_users && runserver` fails) and the
+`ensure_admin` job fails when a configured email belongs to another user. Both commands also
+abort when the configured username belongs to a social user. Find duplicates
+(case-insensitive) with:
+
+```bash
+docker compose exec wagtail uv run manage.py shell -c "from django.contrib.auth import get_user_model; from django.db.models import Count; from django.db.models.functions import Lower; print(list(get_user_model().objects.annotate(e=Lower('email')).exclude(e='').values('e').annotate(n=Count('id')).filter(n__gt=1)))"
+```
+
+It must print `[]`. Otherwise change the email of, or delete, all but one account per address in
+the Wagtail admin of the running (old) version, or in the Django shell. The local
+`DJANGO_*_EMAIL` values must differ from each other and from every other user's email, or the
+dev stack won't start.
+
+The frontend gets relative `login_url`s from `/api/auth/providers/`; because it is cross-origin
+in production it prefixes them with the API origin (it already does, via `apiUrl()`).
 
 ### Auth0 roles
 
@@ -398,11 +476,46 @@ exports.onExecutePostLogin = async (event, api) => {
 
 Roles are synced at login, so changes apply at the user's next login. Users without a mapped role
 can log in but have no access (the API answers 403 with `code: "no_access"`). Deploy the
-Action and assign roles before deploying this version. If `AUTH0_ROLES_CLAIM` is unset,
-the Auth0 login fails with a 500; if it is set but roles are not assigned yet, users lose
-access at their next login. Practical rule: deploy the infrastructure (Action, roles, env
-var) and assign roles before bumping the CMS image.
+Action and assign roles before deploying this version. If `auth0` is enabled and
+`AUTH0_ROLES_CLAIM` is unset, the app refuses to start; if it is set but roles are not
+assigned yet, users lose access at their next login. Practical rule: deploy the infrastructure
+(Action, roles, env var) and assign roles before bumping the CMS image.
 
-Because superuser and staff follow the `admin` role on every Auth0 login, anyone given
-superuser/staff by hand in Wagtail who logs in via Auth0 loses it at the next login unless
-they hold the `admin` role.
+Because superuser and staff follow the `admin` role on every social login, anyone given
+superuser/staff by hand in Wagtail who logs in via Auth0 or Zitadel loses it at the next login
+unless they hold the `admin` role.
+
+### Zitadel setup
+
+1. Create a project with the roles `admin`, `editor` and `moderator`, and grant them to users
+   (Project → Authorizations).
+2. In the project settings enable "Assert Roles on Authentication" so the roles are included
+   in the tokens.
+3. Create a Web application in the project (authentication method Code, with a client secret).
+   In its settings enable "User roles inside ID Token" and "User Info inside ID Token" (the latter
+   puts `email` and `email_verified` into the ID token). The `urn:zitadel:iam:org:project:roles`
+   scope is requested automatically.
+4. Redirect URI: `https://<host>/complete/zitadel/` (e.g. `http://localhost:8080/complete/zitadel/`
+   locally). Post-logout redirect URIs: the URLs users are sent back to after logout, i.e. the
+   admin URL and the frontend URL. Zitadel only accepts registered post-logout URIs (exact match),
+   so every `next` URL used for logout (admin and frontend) must be registered; otherwise Zitadel
+   shows an error page after the local logout.
+5. Set `SOCIAL_AUTH_ZITADEL_DOMAIN` (bare instance host), `SOCIAL_AUTH_ZITADEL_KEY` (client ID)
+   and `SOCIAL_AUTH_ZITADEL_SECRET`, and add `zitadel` to `AUTH_PROVIDERS`.
+6. Optionally set `ZITADEL_ROLE_ORG_ID` to the id of the organisation that owns the project. The
+   roles claim maps each role to the organisations it was granted in; with this setting only roles
+   granted in that organisation are accepted. Without it roles from every organisation are
+   trusted, so the project must not be granted to other organisations: their admins could assign
+   `admin` to their own users, who would become superusers.
+
+`ROLE_GROUP_MAP` (`editor` → Editors, `moderator` → Moderators) is shared by all providers, so
+Zitadel and Auth0 roles with the same name map to the same groups.
+
+### Local accounts
+
+`local` enables username/password login for Django accounts (Wagtail admin, `ensure_users`,
+`ensure_admin`). They have no 2FA; where 2FA is required, remove `local` from `AUTH_PROVIDERS`
+and manage access through the identity provider.
+
+The Docker image build runs `collectstatic` with `AUTH_PROVIDERS=local`, since no provider variables
+exist at build time.

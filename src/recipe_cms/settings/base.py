@@ -14,6 +14,12 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
+from oidc_auth.config import (
+    authentication_backends,
+    check_provider_settings,
+    parse_auth_providers,
+)
+
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = PROJECT_DIR.parent
 
@@ -27,7 +33,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 
 INSTALLED_APPS = [
     "image_auth",
-    "auth0_auth",
+    "oidc_auth",
     "home",
     "recipes",
     "storages",
@@ -38,7 +44,7 @@ INSTALLED_APPS = [
     "wagtail.embeds",
     "wagtail.sites",
     "wagtail.locales",
-    "wagtail.users",
+    "oidc_auth.apps.CustomUsersAppConfig",
     "wagtail.snippets",
     "wagtail.documents",
     "wagtail.images",
@@ -68,6 +74,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "oidc_auth.middleware.LoginRefusedMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
 ]
@@ -89,6 +96,7 @@ TEMPLATES = [
                 "social_django.context_processors.login_redirect",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "oidc_auth.context_processors.auth_providers",
             ],
         },
     },
@@ -114,10 +122,10 @@ DATABASES = {
     }
 }
 
-AUTHENTICATION_BACKENDS = [
-    "social_core.backends.auth0_openidconnect.Auth0OpenIdConnectAuth",
-    "django.contrib.auth.backends.ModelBackend",
-]
+# Enabled login methods: comma-separated subset of local, auth0, zitadel. An
+# empty value (compose passes unset variables through as "") means the default.
+AUTH_PROVIDERS = parse_auth_providers(os.getenv("AUTH_PROVIDERS") or "local,auth0")
+AUTHENTICATION_BACKENDS = authentication_backends(AUTH_PROVIDERS)
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -148,17 +156,24 @@ SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET = os.getenv(
 )
 SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SCOPE = ["openid", "profile", "email", "offline_access"]
 
-# Auth0 roles: the ID token claim holding the roles list (set by an Auth0
-# post-login Action) and the mapping from Auth0 role names to Wagtail groups.
+SOCIAL_AUTH_ZITADEL_DOMAIN = os.getenv("SOCIAL_AUTH_ZITADEL_DOMAIN", None)
+SOCIAL_AUTH_ZITADEL_KEY = os.getenv("SOCIAL_AUTH_ZITADEL_KEY", None)
+SOCIAL_AUTH_ZITADEL_SECRET = os.getenv("SOCIAL_AUTH_ZITADEL_SECRET", None)
+# Optional: only accept Zitadel roles granted in this organisation. Empty
+# accepts roles from any organisation the project is granted to.
+ZITADEL_ROLE_ORG_ID = os.getenv("ZITADEL_ROLE_ORG_ID", "")
+
+# Auth0 roles claim (a list set by an Auth0 post-login Action) and the mapping
+# from a sign-in provider's role names to Wagtail groups.
 # The "admin" role is not mapped; it grants is_superuser and is_staff.
 AUTH0_ROLES_CLAIM = os.getenv("AUTH0_ROLES_CLAIM", "")
-AUTH0_ROLE_GROUP_MAP = {"editor": "Editors", "moderator": "Moderators"}
+ROLE_GROUP_MAP = {"editor": "Editors", "moderator": "Moderators"}
 
 # Username/password login endpoint for the frontend dev server. Only the dev
 # settings turn it on; it must stay off everywhere else.
 DEV_PASSWORD_LOGIN = False
 
-# Social auth pipeline - includes the step that syncs Auth0 roles to groups
+# Social auth pipeline - includes the step that syncs provider roles to groups
 SOCIAL_AUTH_PIPELINE = (
     # Get the information we can about the user and return it in a simple
     # format to create the user instance later. In some cases the details are
@@ -174,6 +189,9 @@ SOCIAL_AUTH_PIPELINE = (
     "social_core.pipeline.social_auth.auth_allowed",
     # Checks if the current social-account is already associated in the site.
     "social_core.pipeline.social_auth.social_user",
+    # Refuse the login unless the verified email belongs to no other account
+    # (local user, other provider or other user of this provider).
+    "oidc_auth.pipeline.enforce_email_ownership",
     # Make up a username for this person, appends a random string at the end if
     # there's any collision.
     "social_core.pipeline.user.get_username",
@@ -183,8 +201,9 @@ SOCIAL_AUTH_PIPELINE = (
     # Associates the current social details with another user account with
     # a similar email address. Disabled by default.
     # 'social_core.pipeline.social_auth.associate_by_email',
-    # Create a user account if we haven't found one yet.
-    "social_core.pipeline.user.create_user",
+    # Create a user account if we haven't found one yet. Wraps social_core's
+    # create_user: losing a race for the email is refused as email_in_use.
+    "oidc_auth.pipeline.create_user",
     # Create the record that associates the social account with the user.
     "social_core.pipeline.social_auth.associate_user",
     # Populate the extra_data field in the social record with the values
@@ -192,8 +211,8 @@ SOCIAL_AUTH_PIPELINE = (
     "social_core.pipeline.social_auth.load_extra_data",
     # Update the user record with any changed info from the auth service.
     "social_core.pipeline.user.user_details",
-    # Custom pipeline function to sync Auth0 roles to Wagtail groups
-    "auth0_auth.pipeline.sync_auth0_roles",
+    # Custom pipeline function to sync a provider's roles to Wagtail groups
+    "oidc_auth.pipeline.sync_roles",
 )
 
 # Internationalization
@@ -259,6 +278,10 @@ AWS_DEFAULT_ACL = "private"
 if os.environ.get("S3_CUSTOM_DOMAIN"):
     AWS_S3_CUSTOM_DOMAIN = os.environ["S3_CUSTOM_DOMAIN"]
 AWS_S3_URL_PROTOCOL = os.environ.get("S3_URL_PROTOCOL", "https:")
+
+# Emails are managed by admins or the sign-in provider; self-service changes
+# would bypass the one-email-one-provider check.
+WAGTAIL_EMAIL_MANAGEMENT_ENABLED = False
 
 # Storage settings
 # See https://docs.djangoproject.com/en/6.0/ref/settings/#std-setting-STORAGES
@@ -331,7 +354,7 @@ LOGGING = {
         },
     },
     "loggers": {
-        "auth0_auth": {
+        "oidc_auth": {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
@@ -340,3 +363,6 @@ LOGGING = {
 }
 
 USE_X_FORWARDED_HOST = True
+
+# Keep last: fail at import if an enabled provider lacks its settings.
+check_provider_settings(AUTH_PROVIDERS, globals())
