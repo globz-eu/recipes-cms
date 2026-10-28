@@ -2,6 +2,7 @@ from django.test import SimpleTestCase
 
 from home.worktree_env import (
     HEADER,
+    check_ports,
     default_postgres_port,
     default_project_name,
     rewrite_env,
@@ -47,6 +48,22 @@ class RewriteEnvTests(SimpleTestCase):
     def test_sanitizes_project_name(self):
         out = rewrite_env("", "Recipes CMS/Feat", 8081, 5433)
         self.assertIn("COMPOSE_PROJECT_NAME=recipes-cms-feat", out)
+
+
+class CheckPortsTests(SimpleTestCase):
+    def test_accepts_extra_stack_ports(self):
+        check_ports(8081, 5433)
+
+    def test_rejects_main_stack_ports(self):
+        with self.assertRaises(ValueError):
+            check_ports(8080, 5433)
+        with self.assertRaises(ValueError):
+            check_ports(8081, 5432)
+
+    def test_rejects_out_of_range(self):
+        for port, db_port in ((80, 5433), (70000, 5433), (8081, 1023), (8081, 0)):
+            with self.assertRaises(ValueError):
+                check_ports(port, db_port)
 
 
 class DefaultsTests(SimpleTestCase):

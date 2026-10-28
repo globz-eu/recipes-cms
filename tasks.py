@@ -7,9 +7,11 @@ from invoke.tasks import task
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from home.worktree_env import (  # noqa: E402
+    check_ports,
     default_postgres_port,
     default_project_name,
     rewrite_env,
+    sanitize_name,
 )
 
 
@@ -85,9 +87,13 @@ def worktree_env(c, port=None, db_port=None, name=None, source=None, force=False
         raise Exit("This is the main worktree; its .env is the source. Aborting.")
     if port is None:
         raise Exit("--port is required (e.g. --port 8081).")
-    port = int(port)
-    db_port = int(db_port) if db_port is not None else default_postgres_port(port)
-    name = name or default_project_name(here.name)
+    try:
+        port = int(port)
+        db_port = int(db_port) if db_port is not None else default_postgres_port(port)
+        check_ports(port, db_port)
+        name = sanitize_name(name) if name else default_project_name(here.name)
+    except ValueError as error:
+        raise Exit(str(error)) from error
     source = Path(source) if source else main / ".env"
     target = here / ".env"
     if target.exists() and not force:

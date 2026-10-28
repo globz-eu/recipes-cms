@@ -39,6 +39,21 @@ def default_postgres_port(port):
     return port - DEFAULT_NGINX_PORT + DEFAULT_POSTGRES_PORT
 
 
+def check_ports(port, db_port):
+    """Raise ValueError unless both ports are usable for an extra stack."""
+    for label, value, main in (
+        ("--port", port, DEFAULT_NGINX_PORT),
+        ("--db-port", db_port, DEFAULT_POSTGRES_PORT),
+    ):
+        if not MIN_PORT <= value <= MAX_PORT:
+            raise ValueError(
+                f"{label} {value} is outside {MIN_PORT}-{MAX_PORT}"
+                + (" (pass --db-port explicitly)" if label == "--db-port" else "")
+            )
+        if value == main:
+            raise ValueError(f"{label} {value} is used by the main stack")
+
+
 def _key(line):
     match = re.match(r"\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=", line)
     return match.group(1) if match else None
