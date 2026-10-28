@@ -98,7 +98,9 @@ services:
       S3_ACCESS_KEY:
       S3_SECRET_KEY:
       S3_ENDPOINT_URL: http://s3:3900
-      S3_CUSTOM_DOMAIN:
+      # Derived from the nginx port; an explicit value in .env wins.
+      S3_CUSTOM_DOMAIN: ${S3_CUSTOM_DOMAIN:-localhost:${NGINX_HOST_PORT:-8080}/media}
+      WAGTAILADMIN_BASE_URL: ${WAGTAILADMIN_BASE_URL:-http://localhost:${NGINX_HOST_PORT:-8080}}
       S3_URL_PROTOCOL:
       DJANGO_ADMIN_USERNAME:
       DJANGO_ADMIN_PASSWORD:
