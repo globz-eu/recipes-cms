@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
-from django.urls import reverse
 from social_django.models import UserSocialAuth
 
 from oidc_auth.backends import ZitadelOpenIdConnect

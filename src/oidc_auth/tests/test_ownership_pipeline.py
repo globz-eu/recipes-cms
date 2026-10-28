@@ -13,7 +13,7 @@ from oidc_auth.exceptions import (
     EmailNotVerified,
     EmailOwnedElsewhere,
 )
-from oidc_auth.ownership import email_owner, social_email_owner
+from oidc_auth.ownership import email_owner
 from oidc_auth.pipeline import create_user, enforce_email_ownership
 
 User = get_user_model()
@@ -163,16 +163,12 @@ class OwnershipLookupTestCase(TestCase):
         User.objects.create_user(username="u", email="")
 
         self.assertIsNone(email_owner(""))
-        self.assertIsNone(social_email_owner(""))
 
-    def test_social_email_owner_ignores_local_users(self):
-        User.objects.create_user(username="local", email=EMAIL)
-        self.assertIsNone(social_email_owner(EMAIL))
+    def test_email_owner_compares_with_lower_like_the_index(self):
+        user = User.objects.create_user(username="u", email="k@example.com")
 
-        social = User.objects.create_user(username="social", email="x" + EMAIL)
-        social.social_auth.create(provider="zitadel", uid="uid")
-        self.assertEqual(social_email_owner("X" + EMAIL), social)
-        self.assertIsNone(social_email_owner("x" + EMAIL, exclude=social))
+        # KELVIN SIGN lowercases to "k"; UPPER-based iexact would not match it.
+        self.assertEqual(email_owner("\u212a@example.com"), user)
 
 
 class UniqueEmailIndexTestCase(TestCase):
