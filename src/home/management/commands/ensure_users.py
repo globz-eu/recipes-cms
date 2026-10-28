@@ -42,6 +42,11 @@ class Command(BaseCommand):
             user, created = User.objects.get_or_create(
                 **{User.USERNAME_FIELD: username}
             )
+            if user.social_auth.exists():
+                raise CommandError(
+                    f"{role.lower()} '{username}': this account signs in "
+                    "through a social provider and cannot get a password."
+                )
             if email is not None:
                 if social_email_owner(email, exclude=user):
                     raise CommandError(

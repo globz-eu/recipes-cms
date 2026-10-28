@@ -245,7 +245,8 @@ docker compose exec wagtail uv run manage.py collectstatic
 
 `ensure_admin` creates a superuser, or updates an existing user with that username to be an
 active superuser with the given password (and email, if given). It is idempotent, so it can
-run on every deploy. The password is read only from `DJANGO_ADMIN_PASSWORD`, so it never
+run on every deploy. It aborts with a `CommandError` if the username belongs to a user who
+signs in through a social provider (such a user is never given a password). The password is read only from `DJANGO_ADMIN_PASSWORD`, so it never
 shows up in the process list or shell history:
 
 ```bash
@@ -438,7 +439,8 @@ Before deploying, check for duplicate emails. Earlier versions did not prevent a
 and an Auth0 user (or two Auth0 users) from sharing an email; now such a social login is refused
 (`email_in_use`), `ensure_users` aborts with a `CommandError` (so the compose start
 `migrate && ensure_users && runserver` fails) and the `ensure_admin` job fails when
-`DJANGO_ADMIN_EMAIL` collides. Find duplicates (case-insensitive) with:
+`DJANGO_ADMIN_EMAIL` collides. Both commands also abort when the configured username belongs
+to a social user. Find duplicates (case-insensitive) with:
 
 ```bash
 docker compose exec wagtail uv run manage.py shell -c "from django.contrib.auth import get_user_model; from django.db.models import Count; from django.db.models.functions import Lower; print(list(get_user_model().objects.annotate(e=Lower('email')).exclude(e='').values('e').annotate(n=Count('id')).filter(n__gt=1)))"
