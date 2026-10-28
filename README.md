@@ -109,7 +109,7 @@ src/
 
 ```bash
 curl -b cookies.txt -H "X-CSRFToken: $TOKEN" -F file=@recipes.json \
-  http://localhost:8000/api/recipes/bulk-upload/
+  http://localhost:8080/api/recipes/bulk-upload/
 ```
 
 Each entry groups the language versions of one recipe (max. 500 entries; a top-level list without `recipes` is accepted too):
@@ -196,8 +196,8 @@ S3_BUCKET_NAME=recipes-cms
 S3_ACCESS_KEY=your-garage-access-key
 S3_SECRET_KEY=your-garage-secret-key
 S3_ENDPOINT_URL=http://s3:3900
-S3_CUSTOM_DOMAIN=localhost:8080/media
 S3_URL_PROTOCOL=http:
+# S3_CUSTOM_DOMAIN and WAGTAILADMIN_BASE_URL are derived from NGINX_HOST_PORT in dev
 ```
 
 Copy `.env.example` to `.env` and fill in the values.
@@ -205,19 +205,37 @@ Copy `.env.example` to `.env` and fill in the values.
 ### Starting the Stack
 
 ```bash
-docker compose up
+uv run invoke dev
 ```
 
-This starts three services:
+This runs `docker compose up --watch` (use watch mode: only it syncs `src/` into the container). It starts these services:
 
-| Service    | Description                  | Port  |
-|------------|------------------------------|-------|
-| `wagtail`  | Django/Wagtail app server    | 8000  |
-| `nginx`    | Reverse proxy / static files | 8080  |
-| `database` | PostgreSQL 18                | 5432  |
-| `s3`       | Garage S3-compatible storage | 3900 (S3 API), 3902 (web), 3903 (admin) |
+| Service    | Description                  | Host port (variable, default)       |
+|------------|------------------------------|-------------------------------------|
+| `nginx`    | Reverse proxy / static files | `NGINX_HOST_PORT`, 8080             |
+| `database` | PostgreSQL 18                | `POSTGRES_HOST_PORT`, 5432          |
+| `wagtail`  | Django/Wagtail app server    | internal (8000)                     |
+| `s3`       | Garage S3-compatible storage | internal (3900-3903)                |
 
-The admin interface is available at http://localhost:8080/admin/.
+The admin interface is available at http://localhost:8080/admin/ (or the port you set in `NGINX_HOST_PORT`). Reach the app through nginx; wagtail and Garage are not published.
+
+`S3_CUSTOM_DOMAIN` (`localhost:<port>/media`) and `WAGTAILADMIN_BASE_URL` (`http://localhost:<port>`) are derived from `NGINX_HOST_PORT`; set them in `.env` only to override. nginx forwards the published port in `X-Forwarded-Host`, so Django builds URLs (CSRF origin, OAuth `redirect_uri`) for the right port.
+
+#### Parallel stacks (git worktrees)
+
+Each git worktree can run its own stack at the same time, as long as it has its own compose project name and host ports. In the worktree:
+
+```bash
+uv run invoke worktree-env --port 8081   # [--db-port 5433] [--name <project>] [--source <.env>] [--force]
+uv run invoke dev
+```
+
+`worktree-env` copies the main worktree's `.env` (or `--source`) to the worktree and sets `COMPOSE_PROJECT_NAME` (default `recipes-cms-<directory name>`), `NGINX_HOST_PORT`, `POSTGRES_HOST_PORT` (default: port offset from 8080/5432, e.g. 8081 -> 5433) and unique `SESSION_COOKIE_NAME` / `CSRF_COOKIE_NAME`. It drops `S3_CUSTOM_DOMAIN` and `WAGTAILADMIN_BASE_URL` so they follow the port again, refuses to run in the main worktree and refuses to overwrite an existing `.env` without `--force`. If you set up `.env` by hand, do the same: a copied `.env` with explicit `:8080` values keeps pointing at the other stack, and a duplicate project name silently shares containers and volumes.
+
+- `uv run invoke test` works in each stack (each has its own database). Browsing media needs the Garage provisioning below.
+- Limits: social login (Auth0/Zitadel) only works on the stack on 8080, because the registered callback URLs use that port; local/dev login works on any port. The frontend dev server (`npm run dev`) proxies to 8080. `CSRF_TRUSTED_ORIGINS` in dev lists only `http://localhost:5173`.
+- Cookies are scoped per host, not per port; the distinct cookie names keep the stacks' sessions apart in one browser.
+- Whoever starts a stack stops it, see "Stopping the Stack".
 
 ### Live Reload (file sync)
 
@@ -227,7 +245,7 @@ Use Docker Compose Watch to automatically sync local source changes into the con
 docker compose watch
 ```
 
-Changes to `src/` are synced into the running container without requiring a restart. Changes to `config/nginx/nginx.conf` trigger an nginx restart.
+Changes to `src/` are synced into the running container without requiring a restart. Changes to `config/nginx/nginx.conf.template` trigger an nginx restart.
 
 ### Running Management Commands
 
@@ -296,6 +314,8 @@ Common development tasks are automated with [Invoke](https://www.pyinvoke.org/).
 | Task | Description |
 |------|-------------|
 | `invoke dev` | Start the development server via Docker Compose with file watching enabled (`--build` flag rebuilds images first) |
+| `invoke down` | Stop and remove this directory's stack (`--volumes` also removes volumes) |
+| `invoke worktree-env` | Write a worktree's `.env` with its own project name, ports and cookie names (`--port` required) |
 | `invoke format` | Format and auto-fix source code using `ruff` |
 | `invoke bump` | Bump the project version, update the lockfile, and create an annotated git tag (`--part major\|minor\|patch`, default: `patch`) |
 
@@ -312,13 +332,17 @@ uv run invoke bump --part minor
 
 ### Stopping the Stack
 
+Stop the `invoke dev` (watch) process first, then:
+
 ```bash
 # Stop containers
-docker compose down
+uv run invoke down            # docker compose down
 
 # Stop and remove volumes (resets database and static files)
-docker compose down -v
+uv run invoke down --volumes  # docker compose down -v
 ```
+
+Use `--volumes` before removing a throwaway worktree, or its volumes stay behind.
 
 ### Object Storage (Garage)
 
@@ -335,7 +359,8 @@ Media files (images, documents) are stored in [Garage](https://garagehq.deuxfleu
 `S3_CUSTOM_DOMAIN` controls the base URL that Django generates for uploaded files. Set it to the public hostname and path prefix that nginx uses to serve media:
 
 ```bash
-# Local dev (nginx on :8080, proxying /media/ to Django)
+# Local dev: derived from NGINX_HOST_PORT (nginx on :8080, proxying /media/ to Django);
+# set only to override
 S3_CUSTOM_DOMAIN=localhost:8080/media
 S3_URL_PROTOCOL=http:
 
@@ -496,7 +521,7 @@ unless they hold the `admin` role.
    puts `email` and `email_verified` into the ID token). The `urn:zitadel:iam:org:project:roles`
    scope is requested automatically.
 4. Redirect URI: `https://<host>/complete/zitadel/` (e.g. `http://localhost:8080/complete/zitadel/`
-   locally). Post-logout redirect URIs: the URLs users are sent back to after logout, i.e. the
+   locally; registered for port 8080 only). Post-logout redirect URIs: the URLs users are sent back to after logout, i.e. the
    admin URL and the frontend URL. Zitadel only accepts registered post-logout URIs (exact match),
    so every `next` URL used for logout (admin and frontend) must be registered; otherwise Zitadel
    shows an error page after the local logout.
