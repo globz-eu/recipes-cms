@@ -56,7 +56,10 @@ def test(c, label="", verbosity=1):
 @task(help={"build": "Build images before running the development server."})
 def dev(c, build=False):
     """Run the development server with docker compose."""
-    c.run(f"docker compose up {'--build' if build else ''} --watch", pty=True)
+    c.run(
+        f"docker compose up {'--build' if build else ''} --watch",
+        pty=True,
+    )
 
 
 @task(help={"volumes": "Also remove volumes (resets database, static files, media)."})
@@ -81,7 +84,8 @@ def _main_worktree(c):
 )
 def worktree_env(c, port=None, db_port=None, name=None, source=None, force=False):
     """Write this worktree's .env with its own project name, ports and cookies."""
-    here = Path.cwd().resolve()
+    # invoke does not chdir to this file; tasks.py sits at the worktree root.
+    here = Path(__file__).resolve().parent
     main = _main_worktree(c)
     if here == main:
         raise Exit("This is the main worktree; its .env is the source. Aborting.")
@@ -101,4 +105,5 @@ def worktree_env(c, port=None, db_port=None, name=None, source=None, force=False
     if not source.is_file():
         raise Exit(f"Source {source} not found.")
     target.write_text(rewrite_env(source.read_text(), name, port, db_port))
+    target.chmod(source.stat().st_mode & 0o777)
     print(f"Wrote {target} (project {name}, nginx :{port}, postgres :{db_port}).")
