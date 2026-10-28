@@ -68,11 +68,18 @@ class LoginRefusedMiddleware:
             return None
         code, message = refusal
 
-        logger.info(
-            "Refused %s login: %s",
-            getattr(getattr(exception, "backend", None), "name", "unknown"),
-            code,
-        )
+        backend_name = getattr(getattr(exception, "backend", None), "name", "unknown")
+        if isinstance(exception, LoginRefused):
+            logger.info("Refused %s login: %s", backend_name, code)
+        else:
+            logger.warning(
+                "Failed %s login: %s (%s: %s)",
+                backend_name,
+                code,
+                type(exception).__name__,
+                exception,
+                exc_info=exception,
+            )
         target = safe_redirect_url(request, request.session.pop("next", None))
         if target:
             return HttpResponseRedirect(_with_auth_error(target, code))

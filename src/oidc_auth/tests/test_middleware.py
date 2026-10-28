@@ -148,6 +148,22 @@ class LoginRefusedMiddlewareTestCase(TestCase):
                     response["Location"], "/frontend/?auth_error=login_failed"
                 )
 
+    def test_generic_auth_exception_is_logged_as_warning_with_details(self):
+        backend = Mock()
+        backend.name = "zitadel"
+        exception = AuthTokenError(backend, "invalid_client")
+
+        with self.assertLogs("oidc_auth.middleware", level="INFO") as logs:
+            self.handle(exception)
+
+        self.assertEqual([r.levelname for r in logs.records], ["WARNING"])
+        message = logs.records[0].getMessage()
+        self.assertIn("zitadel", message)
+        self.assertIn("login_failed", message)
+        self.assertIn("AuthTokenError", message)
+        self.assertIn("invalid_client", message)
+        self.assertIs(logs.records[0].exc_info[1], exception)
+
     def test_login_failed_message_on_admin_login_fallback(self):
         request, response = self.handle(AuthCanceled(Mock()), next_url=None)
 
