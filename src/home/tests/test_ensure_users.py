@@ -80,6 +80,18 @@ class EnsureUsersCommandTests(TestCase):
 
         self.assertFalse(User.objects.filter(username="editor").exists())
 
+    def test_refuses_email_of_another_local_user(self):
+        User.objects.create_user(username="local", email="Shared@example.com")
+
+        with self.assertRaisesMessage(CommandError, "another user ('local')"):
+            self._call(
+                DJANGO_EDITOR_USERNAME="editor",
+                DJANGO_EDITOR_PASSWORD=PASSWORD,
+                DJANGO_EDITOR_EMAIL="shared@example.com",
+            )
+
+        self.assertFalse(User.objects.filter(username="editor").exists())
+
     def test_refuses_username_of_social_user(self):
         social = User.objects.create_user(username="editor", email="owner@example.com")
         social.social_auth.create(provider="zitadel", uid="z-1")

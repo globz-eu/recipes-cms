@@ -49,10 +49,37 @@ class EmailOwnershipFormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("signs in with mystery.", form.errors["email"][0])
 
-    def test_email_of_another_local_user_is_not_rejected_by_this_rule(self):
-        User.objects.create_user(username="local", email="local@example.com")
+    def test_creation_rejects_email_of_another_local_user_case_insensitively(self):
+        User.objects.create_user(username="local", email="Local@example.com")
 
-        form = OwnedEmailUserCreationForm(creation_data(email="local@example.com"))
+        form = OwnedEmailUserCreationForm(creation_data(email="local@EXAMPLE.com"))
+
+        self.assertFalse(form.is_valid())
+        self.assertIn(
+            "Another user already has this email address.", form.errors["email"]
+        )
+
+    def test_edit_rejects_email_of_another_local_user(self):
+        User.objects.create_user(username="local", email="local@example.com")
+        other = User.objects.create_user(username="other", email="other@example.com")
+        data = creation_data(username="other", email="LOCAL@example.com")
+        data.pop("password1")
+        data.pop("password2")
+
+        form = OwnedEmailUserEditForm(data, instance=other)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn(
+            "Another user already has this email address.", form.errors["email"]
+        )
+
+    def test_editing_a_local_user_keeps_its_own_email_valid(self):
+        local = User.objects.create_user(username="local", email="local@example.com")
+        data = creation_data(username="local", email="Local@example.com")
+        data.pop("password1")
+        data.pop("password2")
+
+        form = OwnedEmailUserEditForm(data, instance=local)
 
         self.assertNotIn("email", form.errors)
 

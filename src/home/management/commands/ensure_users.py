@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from oidc_auth.ownership import social_email_owner
+from oidc_auth.ownership import email_owner
 
 # env prefix -> (superuser?, group name)
 ROLES = {
@@ -48,10 +48,16 @@ class Command(BaseCommand):
                     "through a social provider and cannot get a password."
                 )
             if email is not None:
-                if social_email_owner(email, exclude=user):
+                owner = email_owner(email, exclude=user)
+                if owner is not None and owner.social_auth.exists():
                     raise CommandError(
                         f"{role.lower()} '{username}': {email} belongs to an "
                         "account that signs in through a social provider."
+                    )
+                if owner is not None:
+                    raise CommandError(
+                        f"{role.lower()} '{username}': {email} belongs to "
+                        f"another user ('{owner.get_username()}')."
                     )
                 user.email = email
             user.is_staff = is_superuser

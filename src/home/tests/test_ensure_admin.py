@@ -91,6 +91,14 @@ class EnsureAdminCommandTests(TestCase):
 
         self.assertFalse(User.objects.filter(username="admin").exists())
 
+    def test_refuses_email_of_another_local_user(self):
+        User.objects.create_user(username="local", email="Shared@example.com")
+
+        with self.assertRaisesMessage(CommandError, "another user ('local')"):
+            self._call("--username", "admin", "--email", "shared@example.com")
+
+        self.assertFalse(User.objects.filter(username="admin").exists())
+
     def test_refuses_username_of_social_user(self):
         social = User.objects.create_user(username="admin", email="owner@example.com")
         social.social_auth.create(provider="zitadel", uid="z-1")

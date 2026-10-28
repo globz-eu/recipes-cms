@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any, Optional
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured
+from social_core.exceptions import AuthAlreadyAssociated
+from social_core.pipeline.user import create_user as social_create_user
 
 from oidc_auth.exceptions import (
     AlreadySignedIn,
@@ -68,6 +70,30 @@ def enforce_email_ownership(
     if email_owner(email, exclude=user) is not None:
         raise EmailOwnedElsewhere(backend)
     return None
+
+
+def create_user(
+    strategy: Any,
+    details: dict[str, Any],
+    backend: Any,
+    user: Optional["AbstractUser"] = None,
+    *args: Any,
+    **kwargs: Any,
+) -> dict[str, Any] | None:
+    """
+    social_core's ``create_user``; losing a race for the email is ``email_in_use``.
+
+    ``enforce_email_ownership`` checks before the insert; two simultaneous first
+    logins with the same email can both pass it. The unique index on the email
+    (migration ``oidc_auth.0001``) then rejects the second insert, which
+    social_django reports as ``AuthAlreadyAssociated``.
+    """
+    try:
+        return social_create_user(strategy, details, backend, user, *args, **kwargs)
+    except AuthAlreadyAssociated as error:
+        if email_owner(details.get("email") or "") is not None:
+            raise EmailOwnedElsewhere(backend) from error
+        raise
 
 
 def sync_roles(

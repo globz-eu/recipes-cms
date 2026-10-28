@@ -1,8 +1,12 @@
 from unittest.mock import Mock
 
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 from django.test import TestCase
+from social_core.exceptions import AuthAlreadyAssociated
+from social_django.utils import load_strategy
 
+from oidc_auth.backends import ZitadelOpenIdConnect
 from oidc_auth.exceptions import (
     AlreadySignedIn,
     EmailMissing,
@@ -10,7 +14,7 @@ from oidc_auth.exceptions import (
     EmailOwnedElsewhere,
 )
 from oidc_auth.ownership import email_owner, social_email_owner
-from oidc_auth.pipeline import enforce_email_ownership
+from oidc_auth.pipeline import create_user, enforce_email_ownership
 
 User = get_user_model()
 
@@ -169,3 +173,49 @@ class OwnershipLookupTestCase(TestCase):
         social.social_auth.create(provider="zitadel", uid="uid")
         self.assertEqual(social_email_owner("X" + EMAIL), social)
         self.assertIsNone(social_email_owner("x" + EMAIL, exclude=social))
+
+
+class UniqueEmailIndexTestCase(TestCase):
+    def test_same_email_in_other_case_cannot_be_inserted(self):
+        User.objects.create_user(username="first", email="Person@Example.com")
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            User.objects.create_user(username="second", email=EMAIL)
+
+    def test_blank_emails_are_not_unique(self):
+        User.objects.create_user(username="first", email="")
+        User.objects.create_user(username="second", email="")
+
+        self.assertEqual(User.objects.filter(email="").count(), 2)
+
+
+class CreateUserTestCase(TestCase):
+    def create(self, username, email):
+        strategy = load_strategy()
+        return create_user(
+            strategy,
+            {"username": username, "email": email},
+            ZitadelOpenIdConnect(strategy),
+            username=username,
+        )
+
+    def test_creates_new_user(self):
+        result = self.create("zuser", EMAIL)
+
+        self.assertTrue(result["is_new"])
+        self.assertEqual(result["user"].email, EMAIL)
+
+    def test_lost_race_for_the_email_is_refused_as_email_in_use(self):
+        # Another login created this user after enforce_email_ownership passed.
+        User.objects.create_user(username="winner", email="PERSON@example.com")
+
+        with self.assertRaises(EmailOwnedElsewhere):
+            self.create("loser", EMAIL)
+
+        self.assertFalse(User.objects.filter(username="loser").exists())
+
+    def test_other_integrity_errors_are_not_reported_as_email_in_use(self):
+        User.objects.create_user(username="taken", email="other@example.com")
+
+        with self.assertRaises(AuthAlreadyAssociated):
+            self.create("taken", EMAIL)

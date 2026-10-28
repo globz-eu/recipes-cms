@@ -13,11 +13,11 @@ stops the app at startup with an `ImproperlyConfigured` error naming every missi
 disabled providers need none.
 
 - **Providers**: Auth0 and Zitadel via OpenID Connect (social-auth), plus local Django accounts. The Wagtail login page and the DRF login page show a button per enabled provider. `GET /api/auth/providers/` returns the enabled methods (`id`, `label`, `login_url`) so the frontend can render its own buttons.
-- **One email, one provider**: a social login is refused, never merged, when the provider does not report `email_verified: true`, or when the email already belongs to a local user, to a user linked to another provider, or to another user of the same provider (compared case-insensitively). A user who is already logged in cannot link a second provider either.
+- **One email, one provider**: a social login is refused, never merged, when the provider does not report `email_verified: true`, or when the email already belongs to a local user, to a user linked to another provider, or to another user of the same provider (compared case-insensitively). A user who is already logged in cannot link a second provider either. A unique database index on the lower-cased email (blank emails excepted, migration `oidc_auth.0001`) enforces this even for simultaneous first logins; the login that loses the race is refused as `email_in_use`.
 - **Role sync**: on every login the user's provider roles are mapped to Wagtail groups (`ROLE_GROUP_MAP`: `editor` → Editors, `moderator` → Moderators); the `admin` role grants superuser and staff. Users without a role have no access. Roles are read from the ID token (falling back to the userinfo response): a list under `AUTH0_ROLES_CLAIM` for Auth0, the keys of the `urn:zitadel:iam:org:project:roles` object for Zitadel.
 - **Logout**: the custom logout view logs out of Django and then of the user's own provider (Auth0 `/v2/logout`, Zitadel `/oidc/v1/end_session`); local users get a plain Django logout.
 - **Local accounts**: when `local` is disabled, password login is off. Permissions keep working through a permissions-only backend. Local accounts have no 2FA, so disable `local` wherever 2FA is required and let the identity provider enforce it.
-- **Emails**: `WAGTAIL_EMAIL_MANAGEMENT_ENABLED = False`, so users cannot change their own email in the Wagtail account page; administrators (or the identity provider) manage emails. The Wagtail user forms and the `ensure_users` / `ensure_admin` commands refuse an email owned by a social user, and the Wagtail user edit form offers no password fields for a social user.
+- **Emails**: `WAGTAIL_EMAIL_MANAGEMENT_ENABLED = False`, so users cannot change their own email in the Wagtail account page; administrators (or the identity provider) manage emails. The Wagtail user forms and the `ensure_users` / `ensure_admin` commands refuse an email that already belongs to another user (social or local, case-insensitively), and the Wagtail user edit form offers no password fields for a social user.
 - **Comprehensive Test Suite**: Organized tests for configuration, pipeline, middleware, forms, views and login pages
 
 #### Configuration
@@ -436,20 +436,23 @@ Rollout note: existing users sign in through a provider that must send `email_ve
 Auth0 and Zitadel do when the `email` scope is requested (Zitadel additionally needs
 "User Info inside ID Token", see below); a provider that does not send it locks everybody out.
 
-Before deploying, check for duplicate emails. Earlier versions did not prevent a local account
-and an Auth0 user (or two Auth0 users) from sharing an email; now such a social login is refused
-(`email_in_use`), `ensure_users` aborts with a `CommandError` (so the compose start
-`migrate && ensure_users && runserver` fails) and the `ensure_admin` job fails when
-`DJANGO_ADMIN_EMAIL` collides. Both commands also abort when the configured username belongs
-to a social user. Find duplicates (case-insensitive) with:
+Before deploying, check for duplicate emails. Earlier versions did not prevent two accounts
+(local or Auth0) from sharing an email. Migration `oidc_auth.0001` adds a unique index on the
+lower-cased email and fails while duplicates exist, so `migrate` (and with it the deployment)
+stops until they are cleaned up; run it only after the cleanup. Afterwards `ensure_users` aborts
+with a `CommandError` (so the compose start `migrate && ensure_users && runserver` fails) and the
+`ensure_admin` job fails when a configured email belongs to another user. Both commands also
+abort when the configured username belongs to a social user. Find duplicates
+(case-insensitive) with:
 
 ```bash
 docker compose exec wagtail uv run manage.py shell -c "from django.contrib.auth import get_user_model; from django.db.models import Count; from django.db.models.functions import Lower; print(list(get_user_model().objects.annotate(e=Lower('email')).exclude(e='').values('e').annotate(n=Count('id')).filter(n__gt=1)))"
 ```
 
 It must print `[]`. Otherwise change the email of, or delete, all but one account per address in
-the Wagtail admin. The local `DJANGO_*_EMAIL` values must also differ from every email of an
-identity-provider user, or the dev stack won't start.
+the Wagtail admin of the running (old) version, or in the Django shell. The local
+`DJANGO_*_EMAIL` values must differ from each other and from every other user's email, or the
+dev stack won't start.
 
 The frontend gets relative `login_url`s from `/api/auth/providers/`; because it is cross-origin
 in production it prefixes them with the API origin (it already does, via `apiUrl()`).

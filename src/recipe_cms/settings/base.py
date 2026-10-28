@@ -201,8 +201,9 @@ SOCIAL_AUTH_PIPELINE = (
     # Associates the current social details with another user account with
     # a similar email address. Disabled by default.
     # 'social_core.pipeline.social_auth.associate_by_email',
-    # Create a user account if we haven't found one yet.
-    "social_core.pipeline.user.create_user",
+    # Create a user account if we haven't found one yet. Wraps social_core's
+    # create_user: losing a race for the email is refused as email_in_use.
+    "oidc_auth.pipeline.create_user",
     # Create the record that associates the social account with the user.
     "social_core.pipeline.social_auth.associate_user",
     # Populate the extra_data field in the social record with the values
