@@ -246,8 +246,9 @@ docker compose exec wagtail uv run manage.py collectstatic
 `ensure_admin` creates a superuser, or updates an existing user with that username to be an
 active superuser with the given password (and email, if given). It is idempotent, so it can
 run on every deploy. It aborts with a `CommandError` if the username belongs to a user who
-signs in through a social provider (such a user is never given a password). The password is read only from `DJANGO_ADMIN_PASSWORD`, so it never
-shows up in the process list or shell history:
+signs in through a social provider (such a user is never given a password). The password
+is read only from `DJANGO_ADMIN_PASSWORD`, so it never shows up in the process list or
+shell history:
 
 ```bash
 docker compose exec -e DJANGO_ADMIN_PASSWORD='…' wagtail \
@@ -421,17 +422,19 @@ Releases are built by CI on `v*.*.*` tags (`invoke bump`); see the infrastructur
 
 ### Refused logins
 
-A social login is refused when the provider sends no email (`email_missing`), when the email is
-unverified (`email_unverified`), when it is already
-owned by another account or sign-in method (`email_in_use`), or when a user who is already
-signed in starts a social login (`already_signed_in`; they must sign out first). The same
-code is used when the provider identity is already linked to a different user. Any other failed provider
-login (cancelled or forbidden, for example the user denies consent, a lost login state or
-a token error) gives the generic `login_failed`. For an existing
-association the email the provider reports at each login is checked; the stored email is never
-refreshed from the provider (social-auth protects `email`). A refused login redirects to the `next` URL given at login start
-(only allowed hosts: the request host and `SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS`) with
-`auth_error=<code>` appended, so the frontend can show a message; without a safe `next` URL the user lands on the Wagtail login page with an error message.
+A social login is refused when the provider sends no email (`email_missing`), when the
+email is unverified (`email_unverified`), when it is already owned by another account or
+sign-in method (`email_in_use`), or when a user who is already signed in starts a social
+login (`already_signed_in`; they must sign out first). The same code is used when the
+provider identity is already linked to a different user. Any other failed provider login
+(cancelled or forbidden, for example the user denies consent, a lost login state or a
+token error) gives the generic `login_failed`. For an existing association the email the
+provider reports at each login is checked; the stored email is never refreshed from the
+provider (social-auth protects `email`). A refused login redirects to the `next` URL
+given at login start (only allowed hosts: the request host and
+`SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS`) with `auth_error=<code>` appended, so the frontend
+can show a message; without a safe `next` URL the user lands on the Wagtail login page
+with an error message.
 
 Rollout note: existing users sign in through a provider that must send `email_verified: true`.
 Auth0 and Zitadel do when the `email` scope is requested (Zitadel additionally needs
