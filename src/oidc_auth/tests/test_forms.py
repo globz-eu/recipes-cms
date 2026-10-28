@@ -77,6 +77,60 @@ class EmailOwnershipFormTests(TestCase):
         self.assertNotIn("email", form.errors)
 
 
+class SocialUserPasswordTests(TestCase):
+    def setUp(self):
+        self.social = User.objects.create_user(
+            username="social", email="owner@example.com"
+        )
+        self.social.social_auth.create(provider="zitadel", uid="z-1")
+        self.social.set_unusable_password()
+        self.social.save()
+
+    def edit_data(self, user, **overrides):
+        return creation_data(username=user.username, email=user.email, **overrides)
+
+    def test_edit_form_of_social_user_has_no_password_fields(self):
+        form = OwnedEmailUserEditForm(instance=self.social)
+
+        self.assertNotIn("password1", form.fields)
+        self.assertNotIn("password2", form.fields)
+
+    def test_posted_password_is_ignored_for_social_user(self):
+        form = OwnedEmailUserEditForm(self.edit_data(self.social), instance=self.social)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        self.social.refresh_from_db()
+        self.assertFalse(self.social.has_usable_password())
+
+    def test_edit_form_of_local_user_keeps_password_fields(self):
+        local = User.objects.create_user(
+            username="local", email="local@example.com", password=PASSWORD
+        )
+
+        form = OwnedEmailUserEditForm(self.edit_data(local), instance=local)
+
+        self.assertIn("password1", form.fields)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        local.refresh_from_db()
+        self.assertTrue(local.check_password(PASSWORD))
+
+    def test_admin_edit_view_does_not_set_password_on_social_user(self):
+        admin = User.objects.create_superuser(
+            username="admin", email="admin@example.com", password=PASSWORD
+        )
+        self.client.force_login(admin)
+        url = reverse("wagtailusers_users:edit", args=[self.social.pk])
+
+        self.assertNotContains(self.client.get(url), 'name="password1"')
+        response = self.client.post(url, self.edit_data(self.social))
+
+        self.assertEqual(response.status_code, 302)
+        self.social.refresh_from_db()
+        self.assertFalse(self.social.has_usable_password())
+
+
 class UsersAdminWiringTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create_superuser(

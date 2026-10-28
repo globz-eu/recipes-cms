@@ -17,7 +17,7 @@ disabled providers need none.
 - **Role sync**: on every login the user's provider roles are mapped to Wagtail groups (`ROLE_GROUP_MAP`: `editor` → Editors, `moderator` → Moderators); the `admin` role grants superuser and staff. Users without a role have no access. Roles are read from the ID token (falling back to the userinfo response): a list under `AUTH0_ROLES_CLAIM` for Auth0, the keys of the `urn:zitadel:iam:org:project:roles` object for Zitadel.
 - **Logout**: the custom logout view logs out of Django and then of the user's own provider (Auth0 `/v2/logout`, Zitadel `/oidc/v1/end_session`); local users get a plain Django logout.
 - **Local accounts**: when `local` is disabled, password login is off. Permissions keep working through a permissions-only backend. Local accounts have no 2FA, so disable `local` wherever 2FA is required and let the identity provider enforce it.
-- **Emails**: `WAGTAIL_EMAIL_MANAGEMENT_ENABLED = False`, so users cannot change their own email in the Wagtail account page; administrators (or the identity provider) manage emails. The Wagtail user forms and the `ensure_users` / `ensure_admin` commands refuse an email owned by a social user.
+- **Emails**: `WAGTAIL_EMAIL_MANAGEMENT_ENABLED = False`, so users cannot change their own email in the Wagtail account page; administrators (or the identity provider) manage emails. The Wagtail user forms and the `ensure_users` / `ensure_admin` commands refuse an email owned by a social user, and the Wagtail user edit form offers no password fields for a social user.
 - **Comprehensive Test Suite**: Organized tests for configuration, pipeline, middleware, forms, views and login pages
 
 #### Configuration
