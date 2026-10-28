@@ -37,11 +37,22 @@ def read_auth0_roles(backend: Any, response: dict[str, Any]) -> set[str]:
 
 
 def read_zitadel_roles(backend: Any, response: dict[str, Any]) -> set[str]:
-    """Zitadel roles: the keys of an object claim. Anything else means no roles."""
+    """Zitadel roles: the keys of an object claim. Anything else means no roles.
+
+    Each value maps the organisation ids the role was granted in to their
+    domains. With ZITADEL_ROLE_ORG_ID set, only roles granted in that
+    organisation count.
+    """
     raw = read_claim(backend, response, ZITADEL_ROLES_CLAIM)
     if not isinstance(raw, dict):
         return set()
-    return {role for role in raw if isinstance(role, str)}
+    org_id = settings.ZITADEL_ROLE_ORG_ID
+    return {
+        role
+        for role, grants in raw.items()
+        if isinstance(role, str)
+        and (not org_id or (isinstance(grants, dict) and org_id in grants))
+    }
 
 
 def auth0_logout_url(

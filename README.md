@@ -179,6 +179,8 @@ AUTH0_ROLES_CLAIM=https://recipes.example/roles
 # SOCIAL_AUTH_ZITADEL_DOMAIN=your-instance.zitadel.cloud
 # SOCIAL_AUTH_ZITADEL_KEY=your-client-id
 # SOCIAL_AUTH_ZITADEL_SECRET=your-client-secret
+# Optional: only trust roles granted in this Zitadel organisation id
+# ZITADEL_ROLE_ORG_ID=
 
 # PostgreSQL
 POSTGRES_USER=recipes
@@ -397,6 +399,7 @@ extra variables:
 | `SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN`, `_KEY`, `_SECRET` | Auth0 application; required when `auth0` is enabled |
 | `AUTH0_ROLES_CLAIM` | Namespaced ID-token claim holding the user's Auth0 roles; required when `auth0` is enabled |
 | `SOCIAL_AUTH_ZITADEL_DOMAIN`, `SOCIAL_AUTH_ZITADEL_KEY`, `SOCIAL_AUTH_ZITADEL_SECRET` | Zitadel instance host (no scheme), client ID and secret; required when `zitadel` is enabled |
+| `ZITADEL_ROLE_ORG_ID` | Optional Zitadel organisation id; when set, only roles granted in that organisation are trusted (see Zitadel setup) |
 
 The frontend lives in [recipes-frontend](https://github.com/globz-eu/recipes-frontend); compose downloads
 its latest release and serves it at `/frontend/`. Its build is environment-independent: deployments use a
@@ -489,6 +492,11 @@ unless they hold the `admin` role.
    shows an error page after the local logout.
 5. Set `SOCIAL_AUTH_ZITADEL_DOMAIN` (bare instance host), `SOCIAL_AUTH_ZITADEL_KEY` (client ID)
    and `SOCIAL_AUTH_ZITADEL_SECRET`, and add `zitadel` to `AUTH_PROVIDERS`.
+6. Optionally set `ZITADEL_ROLE_ORG_ID` to the id of the organisation that owns the project. The
+   roles claim maps each role to the organisations it was granted in; with this setting only roles
+   granted in that organisation are accepted. Without it roles from every organisation are
+   trusted, so the project must not be granted to other organisations: their admins could assign
+   `admin` to their own users, who would become superusers.
 
 `ROLE_GROUP_MAP` (`editor` → Editors, `moderator` → Moderators) is shared by all providers, so
 Zitadel and Auth0 roles with the same name map to the same groups.

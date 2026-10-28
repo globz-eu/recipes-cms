@@ -210,3 +210,33 @@ class SyncZitadelRolesTestCase(TestCase):
     def test_unknown_backend_fails_loudly(self):
         with self.assertRaisesMessage(ImproperlyConfigured, "github"):
             self.sync(name="github")
+
+    @override_settings(ZITADEL_ROLE_ORG_ID="org-1")
+    def test_org_id_accepts_only_roles_granted_in_that_org(self):
+        self.sync(
+            id_token={
+                ZITADEL_CLAIM: {
+                    "editor": {"org-1": "one.example"},
+                    "moderator": {"org-2": "two.example"},
+                    "admin": {"org-2": "two.example"},
+                }
+            }
+        )
+        self.user.refresh_from_db()
+
+        self.assertEqual(self.group_names(), {"Editors"})
+        self.assertFalse(self.user.is_superuser)
+
+    @override_settings(ZITADEL_ROLE_ORG_ID="org-1")
+    def test_org_id_rejects_malformed_grants(self):
+        for grants in (None, "org-1", ["org-1"], {}):
+            with self.subTest(grants=grants):
+                self.sync(id_token={ZITADEL_CLAIM: {"editor": grants}})
+
+                self.assertEqual(self.group_names(), set())
+
+    @override_settings(ZITADEL_ROLE_ORG_ID="")
+    def test_empty_org_id_accepts_roles_from_any_org(self):
+        self.sync(id_token={ZITADEL_CLAIM: {"editor": {"org-2": "two.example"}}})
+
+        self.assertEqual(self.group_names(), {"Editors"})

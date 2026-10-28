@@ -159,6 +159,9 @@ SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SCOPE = ["openid", "profile", "email", "offline_
 SOCIAL_AUTH_ZITADEL_DOMAIN = os.getenv("SOCIAL_AUTH_ZITADEL_DOMAIN", None)
 SOCIAL_AUTH_ZITADEL_KEY = os.getenv("SOCIAL_AUTH_ZITADEL_KEY", None)
 SOCIAL_AUTH_ZITADEL_SECRET = os.getenv("SOCIAL_AUTH_ZITADEL_SECRET", None)
+# Optional: only accept Zitadel roles granted in this organisation. Empty
+# accepts roles from any organisation the project is granted to.
+ZITADEL_ROLE_ORG_ID = os.getenv("ZITADEL_ROLE_ORG_ID", "")
 
 # Auth0 roles claim (a list set by an Auth0 post-login Action) and the mapping
 # from a sign-in provider's role names to Wagtail groups.
