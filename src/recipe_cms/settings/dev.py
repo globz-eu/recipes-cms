@@ -22,5 +22,5 @@ CSRF_TRUSTED_ORIGINS = ["http://localhost:5173"]
 
 # Distinct cookie names let several dev stacks share one browser (cookies are
 # scoped per host, not per port).
-SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "sessionid")
-CSRF_COOKIE_NAME = os.getenv("CSRF_COOKIE_NAME", "csrftoken")
+SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME") or "sessionid"
+CSRF_COOKIE_NAME = os.getenv("CSRF_COOKIE_NAME") or "csrftoken"

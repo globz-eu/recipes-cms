@@ -30,6 +30,11 @@ class DevCookieNameTests(SimpleTestCase):
         self.assertEqual(dev.SESSION_COOKIE_NAME, "sessionid")
         self.assertEqual(dev.CSRF_COOKIE_NAME, "csrftoken")
 
+    def test_empty_values_fall_back_to_defaults(self):
+        dev = self.load_dev(SESSION_COOKIE_NAME="", CSRF_COOKIE_NAME="")
+        self.assertEqual(dev.SESSION_COOKIE_NAME, "sessionid")
+        self.assertEqual(dev.CSRF_COOKIE_NAME, "csrftoken")
+
     def test_overridden_from_env(self):
         dev = self.load_dev(SESSION_COOKIE_NAME="s_sid", CSRF_COOKIE_NAME="s_csrf")
         self.assertEqual(dev.SESSION_COOKIE_NAME, "s_sid")
