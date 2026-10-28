@@ -49,7 +49,7 @@ def test(c, label="", verbosity=1):
     """Run the Django test suite inside the wagtail Docker Compose service."""
     c.run(
         f"docker compose exec wagtail uv run manage.py test {label} --verbosity={verbosity}",
-        pty=True,
+        pty=sys.stdout.isatty(),
     )
 
 
@@ -58,14 +58,14 @@ def dev(c, build=False):
     """Run the development server with docker compose."""
     c.run(
         f"docker compose up {'--build' if build else ''} --watch",
-        pty=True,
+        pty=sys.stdout.isatty(),
     )
 
 
 @task(help={"volumes": "Also remove volumes (resets database, static files, media)."})
 def down(c, volumes=False):
     """Stop and remove this directory's dev stack (stop `invoke dev` first)."""
-    c.run(f"docker compose down {'-v' if volumes else ''}", pty=True)
+    c.run(f"docker compose down {'-v' if volumes else ''}", pty=sys.stdout.isatty())
 
 
 def _main_worktree(c):
