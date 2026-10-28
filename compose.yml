@@ -7,7 +7,7 @@ services:
           path: config/nginx/nginx.conf.template
     ports:
       - target: 8080
-        published: 8080
+        published: "${NGINX_HOST_PORT:-8080}"
         protocol: tcp
     environment:
       # Rendered into the template by the image entrypoint (envsubst).
@@ -79,10 +79,6 @@ services:
         uv run manage.py migrate --noinput &&
         uv run manage.py ensure_users &&
         uv run manage.py runserver 0.0.0.0:8000
-    ports:
-      - target: 8000
-        published: 8000
-        protocol: tcp
     environment:
       AUTH_PROVIDERS:
       SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN:
@@ -131,7 +127,7 @@ services:
     image: postgres:18
     ports:
       - target: 5432
-        published: 5432
+        published: "${POSTGRES_HOST_PORT:-5432}"
         protocol: tcp
     environment:
       POSTGRES_USER:
@@ -151,19 +147,6 @@ services:
 
   s3:
     image: dxflrs/garage:v2.2.0
-    ports:
-      - target: 3900
-        published: 3900
-        protocol: tcp
-      - target: 3901
-        published: 3901
-        protocol: tcp
-      - target: 3902
-        published: 3902
-        protocol: tcp
-      - target: 3903
-        published: 3903
-        protocol: tcp
     volumes:
       - source: config/garage/garage.toml
         target: /etc/garage.toml
