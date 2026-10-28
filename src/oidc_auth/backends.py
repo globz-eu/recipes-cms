@@ -19,7 +19,6 @@ class ZitadelOpenIdConnect(OpenIdConnectAuth):
         "profile",
         "email",
         "urn:zitadel:iam:org:project:roles",
-        "offline_access",
     ]
 
     def oidc_endpoint(self) -> str:

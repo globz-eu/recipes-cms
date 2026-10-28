@@ -22,3 +22,6 @@ class ZitadelOpenIdConnectTests(SimpleTestCase):
 
         self.assertIn("urn:zitadel:iam:org:project:roles", scope)
         self.assertIn("openid", scope)
+
+    def test_scope_does_not_request_refresh_tokens(self):
+        self.assertNotIn("offline_access", self.backend().get_scope())
