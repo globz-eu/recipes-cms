@@ -1,4 +1,16 @@
+import sys
+from pathlib import Path
+
+from invoke.exceptions import Exit
 from invoke.tasks import task
+
+sys.path.insert(0, str(Path(__file__).parent / "src"))
+
+from home.worktree_env import (  # noqa: E402
+    default_postgres_port,
+    default_project_name,
+    rewrite_env,
+)
 
 
 @task(
@@ -43,3 +55,44 @@ def test(c, label="", verbosity=1):
 def dev(c, build=False):
     """Run the development server with docker compose."""
     c.run(f"docker compose up {'--build' if build else ''} --watch", pty=True)
+
+
+@task(help={"volumes": "Also remove volumes (resets database, static files, media)."})
+def down(c, volumes=False):
+    """Stop and remove this directory's dev stack (stop `invoke dev` first)."""
+    c.run(f"docker compose down {'-v' if volumes else ''}", pty=True)
+
+
+def _main_worktree(c):
+    out = c.run("git worktree list --porcelain", hide=True).stdout
+    return Path(out.splitlines()[0].removeprefix("worktree ")).resolve()
+
+
+@task(
+    help={
+        "port": "Host port for nginx (required, e.g. 8081).",
+        "db_port": "Host port for postgres (default: port - 8080 + 5432).",
+        "name": "Compose project name (default: recipes-cms-<directory name>).",
+        "source": "Source .env (default: the main worktree's).",
+        "force": "Overwrite an existing .env.",
+    }
+)
+def worktree_env(c, port=None, db_port=None, name=None, source=None, force=False):
+    """Write this worktree's .env with its own project name, ports and cookies."""
+    here = Path.cwd().resolve()
+    main = _main_worktree(c)
+    if here == main:
+        raise Exit("This is the main worktree; its .env is the source. Aborting.")
+    if port is None:
+        raise Exit("--port is required (e.g. --port 8081).")
+    port = int(port)
+    db_port = int(db_port) if db_port is not None else default_postgres_port(port)
+    name = name or default_project_name(here.name)
+    source = Path(source) if source else main / ".env"
+    target = here / ".env"
+    if target.exists() and not force:
+        raise Exit(f"{target} exists; use --force to overwrite it.")
+    if not source.is_file():
+        raise Exit(f"Source {source} not found.")
+    target.write_text(rewrite_env(source.read_text(), name, port, db_port))
+    print(f"Wrote {target} (project {name}, nginx :{port}, postgres :{db_port}).")
