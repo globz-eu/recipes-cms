@@ -58,8 +58,9 @@ def check_ports(port, db_port, dev_server_port=None, derived=()):
 
     `dev_server_port` (the frontend dev server) may be 5173: it is a valid
     choice for a single dev server, which then targets this stack. It must not
-    be one of this stack's own host ports. `derived` names the options
-    (`--db-port`, `--dev-server-port`) whose value was derived from `port`; an
+    be a host port of this stack or of the main stack. `derived` names the
+    options (`--db-port`, `--dev-server-port`) whose value was derived from
+    `port`; an
     out-of-range error for them suggests passing the option explicitly.
     """
     checks = [
@@ -76,6 +77,10 @@ def check_ports(port, db_port, dev_server_port=None, derived=()):
             )
         if value == main:
             raise ValueError(f"{label} {value} is used by the main stack")
+    if dev_server_port in (DEFAULT_NGINX_PORT, DEFAULT_POSTGRES_PORT):
+        raise ValueError(
+            f"--dev-server-port {dev_server_port} is used by the main stack"
+        )
     if dev_server_port in (port, db_port):
         raise ValueError(
             f"--dev-server-port {dev_server_port} is a host port of this stack"

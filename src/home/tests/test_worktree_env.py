@@ -100,6 +100,10 @@ class CheckPortsTests(SimpleTestCase):
             with self.assertRaises(ValueError) as caught:
                 check_ports(8081, 5433, dev_server_port)
             self.assertIn("host port of this stack", str(caught.exception))
+        for dev_server_port in (8080, 5432):
+            with self.assertRaises(ValueError) as caught:
+                check_ports(8081, 5433, dev_server_port)
+            self.assertIn("used by the main stack", str(caught.exception))
 
     def test_explicit_hint_only_for_derived_ports(self):
         cases = (
