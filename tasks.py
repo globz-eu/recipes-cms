@@ -108,13 +108,16 @@ def worktree_env(
         raise Exit("--port is required (e.g. --port 8081).")
     try:
         port = int(port)
-        db_port = int(db_port) if db_port is not None else default_postgres_port(port)
-        dev_server_port = (
-            int(dev_server_port)
-            if dev_server_port is not None
-            else default_dev_server_port(port)
-        )
-        check_ports(port, db_port, dev_server_port)
+        derived = set()
+        if db_port is None:
+            db_port = default_postgres_port(port)
+            derived.add("--db-port")
+        if dev_server_port is None:
+            dev_server_port = default_dev_server_port(port)
+            derived.add("--dev-server-port")
+        db_port = int(db_port)
+        dev_server_port = int(dev_server_port)
+        check_ports(port, db_port, dev_server_port, derived)
         name = sanitize_name(name) if name else default_project_name(here.name)
     except ValueError as error:
         raise Exit(str(error)) from error

@@ -53,27 +53,32 @@ def dev_frontend_origins(dev_server_port):
     return ",".join(f"http://localhost:{p}" for p in ports)
 
 
-def check_ports(port, db_port, dev_server_port=None):
+def check_ports(port, db_port, dev_server_port=None, derived=()):
     """Raise ValueError unless the ports are usable for an extra stack.
 
     `dev_server_port` (the frontend dev server) may be 5173: it is a valid
-    choice for a single dev server, which then targets this stack.
+    choice for a single dev server, which then targets this stack. It must not
+    be one of this stack's own host ports. `derived` names the options
+    (`--db-port`, `--dev-server-port`) whose value was derived from `port`; an
+    out-of-range error for them suggests passing the option explicitly.
     """
-    for label, value, main in (
+    checks = [
         ("--port", port, DEFAULT_NGINX_PORT),
         ("--db-port", db_port, DEFAULT_POSTGRES_PORT),
-    ):
+    ]
+    if dev_server_port is not None:
+        checks.append(("--dev-server-port", dev_server_port, None))
+    for label, value, main in checks:
         if not MIN_PORT <= value <= MAX_PORT:
             raise ValueError(
                 f"{label} {value} is outside {MIN_PORT}-{MAX_PORT}"
-                + (" (pass --db-port explicitly)" if label == "--db-port" else "")
+                + (f" (pass {label} explicitly)" if label in derived else "")
             )
         if value == main:
             raise ValueError(f"{label} {value} is used by the main stack")
-    if dev_server_port is not None and not MIN_PORT <= dev_server_port <= MAX_PORT:
+    if dev_server_port in (port, db_port):
         raise ValueError(
-            f"--dev-server-port {dev_server_port} is outside {MIN_PORT}-{MAX_PORT}"
-            " (pass --dev-server-port explicitly)"
+            f"--dev-server-port {dev_server_port} is a host port of this stack"
         )
 
 

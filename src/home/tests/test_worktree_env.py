@@ -95,6 +95,26 @@ class CheckPortsTests(SimpleTestCase):
                 check_ports(8081, 5433, dev_server_port)
             self.assertIn("--dev-server-port", str(caught.exception))
 
+    def test_dev_server_port_not_a_stack_port(self):
+        for dev_server_port in (8081, 5433):
+            with self.assertRaises(ValueError) as caught:
+                check_ports(8081, 5433, dev_server_port)
+            self.assertIn("host port of this stack", str(caught.exception))
+
+    def test_explicit_hint_only_for_derived_ports(self):
+        cases = (
+            ("--db-port", (8081, 70000, 5174)),
+            ("--dev-server-port", (8081, 5433, 70000)),
+        )
+        for label, ports in cases:
+            with self.subTest(label=label):
+                with self.assertRaises(ValueError) as caught:
+                    check_ports(*ports)
+                self.assertNotIn("explicitly", str(caught.exception))
+                with self.assertRaises(ValueError) as caught:
+                    check_ports(*ports, derived={label})
+                self.assertIn(f"(pass {label} explicitly)", str(caught.exception))
+
 
 class DefaultsTests(SimpleTestCase):
     def test_postgres_port_offset(self):
