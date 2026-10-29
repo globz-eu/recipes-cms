@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import Client, TestCase, override_settings
@@ -25,7 +26,7 @@ class CsrfTokenViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["csrfToken"])
-        self.assertIn("csrftoken", response.cookies)
+        self.assertIn(settings.CSRF_COOKIE_NAME, response.cookies)
 
     def test_is_available_to_anonymous_users(self):
         response = self.client.get(reverse("api-csrf"))

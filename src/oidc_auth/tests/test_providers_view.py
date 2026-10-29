@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
@@ -43,4 +44,4 @@ class AuthProvidersViewTests(TestCase):
         client = Client(enforce_csrf_checks=True)
         response = client.get(reverse("api-auth-providers"))
         self.assertEqual(response.status_code, 200)
-        self.assertNotIn("sessionid", response.cookies)
+        self.assertNotIn(settings.SESSION_COOKIE_NAME, response.cookies)
