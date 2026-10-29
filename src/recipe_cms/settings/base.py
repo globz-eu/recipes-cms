@@ -20,6 +20,16 @@ from oidc_auth.config import (
     parse_auth_providers,
 )
 
+
+def env_list(name: str, default=()) -> list[str]:
+    """Read a comma-separated environment variable into a list, skipping blanks.
+
+    Returns a copy of ``default`` when the variable is unset or has no items.
+    """
+    items = [item.strip() for item in os.getenv(name, "").split(",") if item.strip()]
+    return items or list(default)
+
+
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = PROJECT_DIR.parent
 
