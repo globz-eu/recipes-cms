@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from home.worktree_env import (  # noqa: E402
     check_ports,
+    default_dev_server_port,
     default_postgres_port,
     default_project_name,
     rewrite_env,
@@ -77,6 +78,10 @@ def _main_worktree(c):
     help={
         "port": "Host port for nginx (required, e.g. 8081).",
         "db_port": "Host port for postgres (default: port - 8080 + 5432).",
+        "dev_server_port": (
+            "Frontend dev server port trusted besides 5173"
+            " (default: port - 8080 + 5173)."
+        ),
         "name": "Compose project name (default: recipes-cms-<directory name>).",
         "source": "Source .env (default: the main worktree's).",
         "force": (
@@ -84,7 +89,15 @@ def _main_worktree(c):
         ),
     }
 )
-def worktree_env(c, port=None, db_port=None, name=None, source=None, force=False):
+def worktree_env(
+    c,
+    port=None,
+    db_port=None,
+    dev_server_port=None,
+    name=None,
+    source=None,
+    force=False,
+):
     """Write this worktree's .env with its own project name, ports and cookies."""
     # invoke does not chdir to this file; tasks.py sits at the worktree root.
     here = Path(__file__).resolve().parent
@@ -96,7 +109,12 @@ def worktree_env(c, port=None, db_port=None, name=None, source=None, force=False
     try:
         port = int(port)
         db_port = int(db_port) if db_port is not None else default_postgres_port(port)
-        check_ports(port, db_port)
+        dev_server_port = (
+            int(dev_server_port)
+            if dev_server_port is not None
+            else default_dev_server_port(port)
+        )
+        check_ports(port, db_port, dev_server_port)
         name = sanitize_name(name) if name else default_project_name(here.name)
     except ValueError as error:
         raise Exit(str(error)) from error
@@ -106,6 +124,11 @@ def worktree_env(c, port=None, db_port=None, name=None, source=None, force=False
         raise Exit(f"{target} exists; use --force to overwrite it.")
     if not source.is_file():
         raise Exit(f"Source {source} not found.")
-    target.write_text(rewrite_env(source.read_text(), name, port, db_port))
+    target.write_text(
+        rewrite_env(source.read_text(), name, port, db_port, dev_server_port)
+    )
     target.chmod(source.stat().st_mode & 0o777)
-    print(f"Wrote {target} (project {name}, nginx :{port}, postgres :{db_port}).")
+    print(
+        f"Wrote {target} (project {name}, nginx :{port}, postgres :{db_port},"
+        f" dev server :{dev_server_port})."
+    )
