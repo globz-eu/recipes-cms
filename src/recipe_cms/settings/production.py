@@ -3,14 +3,9 @@ import os
 from corsheaders.defaults import default_headers, default_methods
 
 from .base import *  # noqa: F403
+from .base import env_list
 
 DEBUG = False
-
-
-def env_list(name: str) -> list[str]:
-    """Read a comma-separated environment variable into a list, skipping blanks."""
-    return [item.strip() for item in os.getenv(name, "").split(",") if item.strip()]
-
 
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS")
 
