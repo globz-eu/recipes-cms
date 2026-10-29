@@ -1,5 +1,6 @@
 import importlib
 import os
+import sys
 from unittest import mock
 
 from django.conf import settings
@@ -37,6 +38,7 @@ class DevFrontendOriginsTests(SimpleTestCase):
     def test_default_when_empty(self):
         dev = self.load_dev(DEV_FRONTEND_ORIGINS="")
         self.assertEqual(dev.CSRF_TRUSTED_ORIGINS, ["http://localhost:5173"])
+        self.assertEqual(dev.SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS, ["localhost:5173"])
 
     def test_read_from_env(self):
         dev = self.load_dev(
@@ -53,6 +55,14 @@ class DevFrontendOriginsTests(SimpleTestCase):
 
 
 class ProductionIgnoresDevOriginsTests(SimpleTestCase):
+    def tearDown(self):
+        # Drop the module reloaded with mocked values; nothing else imports it.
+        import recipe_cms.settings
+
+        sys.modules.pop("recipe_cms.settings.production", None)
+        if hasattr(recipe_cms.settings, "production"):
+            del recipe_cms.settings.production
+
     def test_production_reads_only_its_own_variables(self):
         with _env(
             DEV_FRONTEND_ORIGINS="http://localhost:5174",
@@ -67,7 +77,17 @@ class ProductionIgnoresDevOriginsTests(SimpleTestCase):
 
 
 @override_settings(
-    SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["localhost:5173", "localhost:5174"]
+    SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["localhost:5173", "localhost:5174"],
+    # AUTHENTICATION_BACKENDS is computed from AUTH_PROVIDERS at import, and
+    # social_django resolves the backend from it: pin both, whatever the env.
+    AUTHENTICATION_BACKENDS=[
+        "social_core.backends.auth0_openidconnect.Auth0OpenIdConnectAuth",
+        "django.contrib.auth.backends.ModelBackend",
+    ],
+    AUTH_PROVIDERS=["local", "auth0"],
+    SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN="auth0.example.com",
+    SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY="key",
+    SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET="secret",
 )
 class DevServerRedirectTests(TestCase):
     """`next` back to a trusted dev server passes both redirect checks."""
@@ -106,13 +126,11 @@ class DevServerRedirectTests(TestCase):
         self.assertEqual(response.content, b"provider redirect")
         return response, self.client.session.get("next")
 
-    @override_settings(AUTH_PROVIDERS=["local", "auth0"])
     def test_social_login_keeps_dev_server_next(self):
         url = "http://localhost:5174/frontend/"
         _, stored = self.begin_login(url)
         self.assertEqual(stored, url)
 
-    @override_settings(AUTH_PROVIDERS=["local", "auth0"])
     def test_social_login_drops_untrusted_next(self):
         # social-core replaces a refused `next` with LOGIN_REDIRECT_URL.
         _, stored = self.begin_login("http://localhost:5199/frontend/")
