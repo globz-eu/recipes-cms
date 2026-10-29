@@ -226,14 +226,15 @@ The admin interface is available at http://localhost:8080/admin/ (or the port yo
 Each git worktree can run its own stack at the same time, as long as it has its own compose project name and host ports. In the worktree:
 
 ```bash
-uv run invoke worktree-env --port 8081   # [--db-port 5433] [--name <project>] [--source <.env>] [--force]
+uv run invoke worktree-env --port 8081   # [--db-port 5433] [--dev-server-port 5174] [--name <project>] [--source <.env>] [--force]
 uv run invoke dev
 ```
 
-`worktree-env` copies the main worktree's `.env` (or `--source`) to the worktree and sets `COMPOSE_PROJECT_NAME` (default `recipes-cms-<directory name>`), `NGINX_HOST_PORT`, `POSTGRES_HOST_PORT` (default: port offset from 8080/5432, e.g. 8081 -> 5433) and unique `SESSION_COOKIE_NAME` / `CSRF_COOKIE_NAME`. It drops `S3_CUSTOM_DOMAIN` and `WAGTAILADMIN_BASE_URL` so they follow the port again, refuses to run in the main worktree and refuses to overwrite an existing `.env` without `--force`. If you set up `.env` by hand, do the same: a copied `.env` with explicit `:8080` values keeps pointing at the other stack, and a duplicate project name silently shares containers and volumes.
+`worktree-env` copies the main worktree's `.env` (or `--source`) to the worktree and sets `COMPOSE_PROJECT_NAME` (default `recipes-cms-<directory name>`), `NGINX_HOST_PORT`, `POSTGRES_HOST_PORT` (default: port offset from 8080/5432, e.g. 8081 -> 5433) unique `SESSION_COOKIE_NAME` / `CSRF_COOKIE_NAME`, and `DEV_FRONTEND_ORIGINS` (`http://localhost:5173` plus the paired frontend dev server port, `5173 + (port - 8080)`, e.g. 8081 -> 5174; `--dev-server-port` overrides it). It drops `S3_CUSTOM_DOMAIN` and `WAGTAILADMIN_BASE_URL` so they follow the port again, refuses to run in the main worktree and refuses to overwrite an existing `.env` without `--force`. If you set up `.env` by hand, do the same: a copied `.env` with explicit `:8080` values keeps pointing at the other stack, and a duplicate project name silently shares containers and volumes.
 
 - `uv run invoke test` works in each stack (each has its own database). Each stack has its own empty Garage, so uploads and browsing media both need the Garage provisioning below (worktree variant: import the copied keys).
-- Limits: social login (Auth0/Zitadel) only works on the stack on 8080, because the registered callback URLs use that port; local/dev login works on any port. The frontend dev server (`npm run dev`) proxies to 8080. `CSRF_TRUSTED_ORIGINS` in dev lists only `http://localhost:5173`.
+- Port pairs: extra stacks use nginx ports 8081-8089, each paired with a frontend dev server port (8081 -> 5174, ..., 8089 -> 5182); recipes-frontend and recipes-infrastructure use the same pairs. A `.env` written before `DEV_FRONTEND_ORIGINS` existed trusts only 5173: rerun `worktree-env --force` or add the line by hand.
+- Limits: social login (Auth0/Zitadel) only works on the stack on 8080 until the extra local origins are registered with the providers (recipes-infrastructure issue #7); the registered callback URLs use port 8080 today. Local/dev login works on any port. The frontend dev server (`npm run dev`) proxies to 8080 until recipes-frontend issue #9 lets it target another stack; run it on 5173 or on the stack's paired port (8081 -> 5174), the origins the stack trusts.
 - Cookies are scoped per host, not per port; the distinct cookie names keep the stacks' sessions apart in one browser.
 - Whoever starts a stack stops it, see "Stopping the Stack".
 
@@ -292,7 +293,9 @@ To work on the frontend against this backend, run `npm run dev` in `../recipes-f
 (http://localhost:5173/frontend/). The dev server proxies to nginx, and its login prompt offers a
 username/password form for the users above. That form posts to `/api/dev-login/`, which only exists
 when `DEV_PASSWORD_LOGIN` is true (set in `recipe_cms.settings.dev` only; it is off in production)
-and is not part of the published frontend build.
+and is not part of the published frontend build. The dev settings trust the dev server origins in
+`DEV_FRONTEND_ORIGINS` (comma-separated, default `http://localhost:5173`) for CSRF and accept them
+as `next` targets of login/logout redirects (`SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS`).
 
 ### Running Tests
 
@@ -315,7 +318,7 @@ Common development tasks are automated with [Invoke](https://www.pyinvoke.org/).
 |------|-------------|
 | `invoke dev` | Start the development server via Docker Compose with file watching enabled (`--build` flag rebuilds images first) |
 | `invoke down` | Stop and remove this directory's stack (`--volumes` also removes volumes) |
-| `invoke worktree-env` | Write a worktree's `.env` with its own project name, ports and cookie names (`--port` required) |
+| `invoke worktree-env` | Write a worktree's `.env` with its own project name, ports, cookie names and dev server origins (`--port` required) |
 | `invoke format` | Format and auto-fix source code using `ruff` |
 | `invoke bump` | Bump the project version, update the lockfile, and create an annotated git tag (`--part major\|minor\|patch`, default: `patch`) |
 
