@@ -79,7 +79,9 @@ def _main_worktree(c):
         "db_port": "Host port for postgres (default: port - 8080 + 5432).",
         "name": "Compose project name (default: recipes-cms-<directory name>).",
         "source": "Source .env (default: the main worktree's).",
-        "force": "Overwrite an existing .env.",
+        "force": (
+            "Overwrite an existing .env (rebuilt from the source; edits are lost)."
+        ),
     }
 )
 def worktree_env(c, port=None, db_port=None, name=None, source=None, force=False):

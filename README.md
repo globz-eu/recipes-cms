@@ -232,7 +232,7 @@ uv run invoke dev
 
 `worktree-env` copies the main worktree's `.env` (or `--source`) to the worktree and sets `COMPOSE_PROJECT_NAME` (default `recipes-cms-<directory name>`), `NGINX_HOST_PORT`, `POSTGRES_HOST_PORT` (default: port offset from 8080/5432, e.g. 8081 -> 5433) and unique `SESSION_COOKIE_NAME` / `CSRF_COOKIE_NAME`. It drops `S3_CUSTOM_DOMAIN` and `WAGTAILADMIN_BASE_URL` so they follow the port again, refuses to run in the main worktree and refuses to overwrite an existing `.env` without `--force`. If you set up `.env` by hand, do the same: a copied `.env` with explicit `:8080` values keeps pointing at the other stack, and a duplicate project name silently shares containers and volumes.
 
-- `uv run invoke test` works in each stack (each has its own database). Browsing media needs the Garage provisioning below.
+- `uv run invoke test` works in each stack (each has its own database). Each stack has its own empty Garage, so uploads and browsing media both need the Garage provisioning below (worktree variant: import the copied keys).
 - Limits: social login (Auth0/Zitadel) only works on the stack on 8080, because the registered callback URLs use that port; local/dev login works on any port. The frontend dev server (`npm run dev`) proxies to 8080. `CSRF_TRUSTED_ORIGINS` in dev lists only `http://localhost:5173`.
 - Cookies are scoped per host, not per port; the distinct cookie names keep the stacks' sessions apart in one browser.
 - Whoever starts a stack stops it, see "Stopping the Stack".
@@ -372,8 +372,8 @@ S3_URL_PROTOCOL=https:
 #### Provisioning Garage for a new environment
 
 ```bash
-# 1. Start the stack
-docker compose up -d
+# 1. Start the stack (in another terminal)
+uv run invoke dev
 
 # 2. Apply layout (single-node cluster)
 docker compose exec s3 /garage layout assign -z dc1 -c 1G $(docker compose exec s3 /garage node id -q | head -c 16)
@@ -384,8 +384,26 @@ docker compose exec s3 /garage bucket create recipes-cms
 docker compose exec s3 /garage key create recipes-cms-key
 docker compose exec s3 /garage bucket allow --read --write --owner recipes-cms --key recipes-cms-key
 
+# 4. Copy the printed key ID / secret into your .env as S3_ACCESS_KEY / S3_SECRET_KEY
+```
 
-# 5. Copy the printed key ID / secret into your .env as S3_ACCESS_KEY / S3_SECRET_KEY
+In a worktree stack, start it with `uv run invoke dev` as in step 1, then provision Garage with the `S3_ACCESS_KEY` / `S3_SECRET_KEY` values from its `.env` (copied from the main stack) instead of `key create`, so `.env` stays valid, also after `worktree-env --force`. Replace the placeholders; there is nothing to copy into `.env`:
+
+```bash
+docker compose exec s3 /garage layout assign -z dc1 -c 1G $(docker compose exec s3 /garage node id -q | head -c 16)
+docker compose exec s3 /garage layout apply --version 1
+docker compose exec s3 /garage bucket create recipes-cms
+docker compose exec s3 /garage key import --yes -n recipes-cms-key <S3_ACCESS_KEY> <S3_SECRET_KEY>
+docker compose exec s3 /garage bucket allow --read --write --owner recipes-cms --key recipes-cms-key
+```
+
+A worktree provisioned earlier with `key create` can be repaired: delete the old key (this also drops its bucket grant), then import the keys from the `.env` that `worktree-env --force` rebuilt and grant them again. The old key is the one whose ID differs from `S3_ACCESS_KEY` (both may be named `recipes-cms-key`). If the stack was running when `.env` was rebuilt, restart `uv run invoke dev` afterwards so wagtail is recreated with the new keys.
+
+```bash
+docker compose exec s3 /garage key list
+docker compose exec s3 /garage key delete --yes <old key id>
+docker compose exec s3 /garage key import --yes -n recipes-cms-key <S3_ACCESS_KEY> <S3_SECRET_KEY>
+docker compose exec s3 /garage bucket allow --read --write --owner recipes-cms --key recipes-cms-key
 ```
 
 #### Fix document ACLs
