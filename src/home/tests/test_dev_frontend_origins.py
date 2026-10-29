@@ -2,6 +2,7 @@ import importlib
 import os
 from unittest import mock
 
+from django.conf import settings
 from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 
@@ -86,26 +87,33 @@ class DevServerRedirectTests(TestCase):
             )
 
     def begin_login(self, next_url):
-        # Stop before the provider redirect (it would fetch the OIDC config);
-        # social-auth has already stored the sanitized `next` by then.
+        """Start a social login; return the response and the stored `next`.
+
+        Stops before the provider redirect (it would fetch the OIDC config);
+        social-auth has already stored the sanitized `next` by then.
+        """
+        started = HttpResponse("provider redirect")
         with mock.patch(
-            "social_core.backends.base.BaseAuth.start", return_value=HttpResponse()
-        ):
-            self.client.get(
+            "social_core.backends.base.BaseAuth.start", return_value=started
+        ) as start:
+            response = self.client.get(
                 "/login/auth0_openidconnect/",
                 {"next": next_url},
                 HTTP_HOST="localhost:8081",
             )
-        return self.client.session.get("next")
+        start.assert_called_once()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"provider redirect")
+        return response, self.client.session.get("next")
 
     @override_settings(AUTH_PROVIDERS=["local", "auth0"])
     def test_social_login_keeps_dev_server_next(self):
         url = "http://localhost:5174/frontend/"
-        self.assertEqual(self.begin_login(url), url)
+        _, stored = self.begin_login(url)
+        self.assertEqual(stored, url)
 
     @override_settings(AUTH_PROVIDERS=["local", "auth0"])
     def test_social_login_drops_untrusted_next(self):
-        self.assertNotEqual(
-            self.begin_login("http://localhost:5199/frontend/"),
-            "http://localhost:5199/frontend/",
-        )
+        # social-core replaces a refused `next` with LOGIN_REDIRECT_URL.
+        _, stored = self.begin_login("http://localhost:5199/frontend/")
+        self.assertEqual(stored, settings.LOGIN_REDIRECT_URL)
