@@ -14,7 +14,7 @@ disabled providers need none.
 
 - **Providers**: Auth0 and Zitadel via OpenID Connect (social-auth), plus local Django accounts. The Wagtail login page and the DRF login page show a button per enabled provider. `GET /api/auth/providers/` returns the enabled methods (`id`, `label`, `login_url`) so the frontend can render its own buttons.
 - **One email, one provider**: a social login is refused, never merged, when the provider does not report `email_verified: true`, or when the email already belongs to a local user, to a user linked to another provider, or to another user of the same provider (compared case-insensitively). A user who is already logged in cannot link a second provider either. A unique database index on the lower-cased email (blank emails excepted, migration `oidc_auth.0001`) enforces this even for simultaneous first logins; the login that loses the race is refused as `email_in_use`.
-- **Role sync**: on every login the user's provider roles are mapped to Wagtail groups (`ROLE_GROUP_MAP`: `editor` → Editors, `moderator` → Moderators); the `admin` role grants superuser and staff. Users without a role have no access. Roles are read from the ID token (falling back to the userinfo response): a list under `AUTH0_ROLES_CLAIM` for Auth0, the keys of the `urn:zitadel:iam:org:project:roles` object for Zitadel.
+- **Role sync**: on every login the user's provider roles are mapped to Wagtail groups (`ROLE_GROUP_MAP`: `editor` → Editors, `moderator` → Moderators); the `admin` role grants superuser and staff. Users without a role have no access. Roles are read from the ID token (falling back to the userinfo response): a list under `AUTH0_ROLES_CLAIM` for Auth0, the keys of the `urn:zitadel:iam:org:project:roles` object for Zitadel, counting only roles granted in the organisation `ZITADEL_ROLE_ORG_ID`.
 - **Logout**: the custom logout view logs out of Django and then of the user's own provider (Auth0 `/v2/logout`, Zitadel `/oidc/v1/end_session`); local users get a plain Django logout.
 - **Local accounts**: when `local` is disabled, password login is off. Permissions keep working through a permissions-only backend. Local accounts have no 2FA, so disable `local` wherever 2FA is required and let the identity provider enforce it.
 - **Emails**: `WAGTAIL_EMAIL_MANAGEMENT_ENABLED = False`, so users cannot change their own email in the Wagtail account page; administrators (or the identity provider) manage emails. The Wagtail user forms and the `ensure_users` / `ensure_admin` commands refuse an email that already belongs to another user (social or local, case-insensitively), and the Wagtail user edit form offers no password fields for a social user.
@@ -37,7 +37,10 @@ AUTH0_ROLES_CLAIM=https://recipes.example/roles
 SOCIAL_AUTH_ZITADEL_DOMAIN=your-instance.zitadel.cloud
 SOCIAL_AUTH_ZITADEL_KEY=your-client-id
 SOCIAL_AUTH_ZITADEL_SECRET=your-client-secret
+ZITADEL_ROLE_ORG_ID=your-org-id
 ```
+
+Deployments with `zitadel` enabled must set `ZITADEL_ROLE_ORG_ID` before upgrading, or the app refuses to start; recipes-infrastructure already sets it.
 
 ### Home (`home`)
 
@@ -179,8 +182,8 @@ AUTH0_ROLES_CLAIM=https://recipes.example/roles
 # SOCIAL_AUTH_ZITADEL_DOMAIN=your-instance.zitadel.cloud
 # SOCIAL_AUTH_ZITADEL_KEY=your-client-id
 # SOCIAL_AUTH_ZITADEL_SECRET=your-client-secret
-# Optional: only trust roles granted in this Zitadel organisation id
-# ZITADEL_ROLE_ORG_ID=
+# Required with zitadel: only roles granted in this Zitadel organisation id are trusted
+# ZITADEL_ROLE_ORG_ID=your-org-id
 
 # PostgreSQL
 POSTGRES_USER=recipes
@@ -447,7 +450,7 @@ extra variables:
 | `SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN`, `_KEY`, `_SECRET` | Auth0 application; required when `auth0` is enabled |
 | `AUTH0_ROLES_CLAIM` | Namespaced ID-token claim holding the user's Auth0 roles; required when `auth0` is enabled |
 | `SOCIAL_AUTH_ZITADEL_DOMAIN`, `SOCIAL_AUTH_ZITADEL_KEY`, `SOCIAL_AUTH_ZITADEL_SECRET` | Zitadel instance host (no scheme), client ID and secret; required when `zitadel` is enabled |
-| `ZITADEL_ROLE_ORG_ID` | Optional Zitadel organisation id; when set, only roles granted in that organisation are trusted (see Zitadel setup) |
+| `ZITADEL_ROLE_ORG_ID` | Id of the Zitadel organisation that owns the project; required when `zitadel` is enabled, and only roles granted in that organisation are trusted (see Zitadel setup) |
 
 The frontend lives in [recipes-frontend](https://github.com/globz-eu/recipes-frontend); compose downloads
 its latest release and serves it at `/frontend/`. Its build is environment-independent: deployments use a
@@ -548,11 +551,11 @@ unless they hold the `admin` role.
    shows an error page after the local logout.
 5. Set `SOCIAL_AUTH_ZITADEL_DOMAIN` (bare instance host), `SOCIAL_AUTH_ZITADEL_KEY` (client ID)
    and `SOCIAL_AUTH_ZITADEL_SECRET`, and add `zitadel` to `AUTH_PROVIDERS`.
-6. Optionally set `ZITADEL_ROLE_ORG_ID` to the id of the organisation that owns the project. The
-   roles claim maps each role to the organisations it was granted in; with this setting only roles
-   granted in that organisation are accepted. Without it roles from every organisation are
-   trusted, so the project must not be granted to other organisations: their admins could assign
-   `admin` to their own users, who would become superusers.
+6. Set `ZITADEL_ROLE_ORG_ID` to the id of the organisation that owns the project; it is required
+   when `zitadel` is enabled (a blank value stops the app at startup). The roles claim maps each
+   role to the organisations it was granted in, and only roles granted in that organisation are
+   accepted, so admins of other organisations the project is granted to cannot assign `admin` to
+   their own users.
 
 `ROLE_GROUP_MAP` (`editor` → Editors, `moderator` → Moderators) is shared by all providers, so
 Zitadel and Auth0 roles with the same name map to the same groups.

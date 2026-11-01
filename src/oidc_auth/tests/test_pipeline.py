@@ -148,7 +148,10 @@ class SyncRolesTestCase(TestCase):
 ZITADEL_CLAIM = "urn:zitadel:iam:org:project:roles"
 
 
-@override_settings(ROLE_GROUP_MAP={"editor": "Editors", "moderator": "Moderators"})
+@override_settings(
+    ROLE_GROUP_MAP={"editor": "Editors", "moderator": "Moderators"},
+    ZITADEL_ROLE_ORG_ID="org-1",
+)
 class SyncZitadelRolesTestCase(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -166,7 +169,7 @@ class SyncZitadelRolesTestCase(TestCase):
 
     def test_object_claim_keys_are_roles(self):
         self.sync(
-            id_token={ZITADEL_CLAIM: {"editor": {"123": "org.example"}, "ghost": {}}}
+            id_token={ZITADEL_CLAIM: {"editor": {"org-1": "one.example"}, "ghost": {}}}
         )
 
         self.assertEqual(self.group_names(), {"Editors"})
@@ -188,20 +191,20 @@ class SyncZitadelRolesTestCase(TestCase):
         self.assertEqual(self.group_names(), set())
 
     def test_falls_back_to_response(self):
-        self.sync(response={ZITADEL_CLAIM: {"moderator": {}}})
+        self.sync(response={ZITADEL_CLAIM: {"moderator": {"org-1": "one.example"}}})
 
         self.assertEqual(self.group_names(), {"Moderators"})
 
     def test_id_token_is_preferred_over_response(self):
         self.sync(
-            id_token={ZITADEL_CLAIM: {"moderator": {}}},
-            response={ZITADEL_CLAIM: {"editor": {}}},
+            id_token={ZITADEL_CLAIM: {"moderator": {"org-1": "one.example"}}},
+            response={ZITADEL_CLAIM: {"editor": {"org-1": "one.example"}}},
         )
 
         self.assertEqual(self.group_names(), {"Moderators"})
 
     def test_admin_role_sets_superuser_and_staff(self):
-        self.sync(id_token={ZITADEL_CLAIM: {"admin": {}}})
+        self.sync(id_token={ZITADEL_CLAIM: {"admin": {"org-1": "one.example"}}})
         self.user.refresh_from_db()
 
         self.assertTrue(self.user.is_superuser)
@@ -211,7 +214,6 @@ class SyncZitadelRolesTestCase(TestCase):
         with self.assertRaisesMessage(ImproperlyConfigured, "github"):
             self.sync(name="github")
 
-    @override_settings(ZITADEL_ROLE_ORG_ID="org-1")
     def test_org_id_accepts_only_roles_granted_in_that_org(self):
         self.sync(
             id_token={
@@ -227,7 +229,6 @@ class SyncZitadelRolesTestCase(TestCase):
         self.assertEqual(self.group_names(), {"Editors"})
         self.assertFalse(self.user.is_superuser)
 
-    @override_settings(ZITADEL_ROLE_ORG_ID="org-1")
     def test_org_id_rejects_malformed_grants(self):
         for grants in (None, "org-1", ["org-1"], {}):
             with self.subTest(grants=grants):
@@ -235,8 +236,16 @@ class SyncZitadelRolesTestCase(TestCase):
 
                 self.assertEqual(self.group_names(), set())
 
-    @override_settings(ZITADEL_ROLE_ORG_ID="")
-    def test_empty_org_id_accepts_roles_from_any_org(self):
-        self.sync(id_token={ZITADEL_CLAIM: {"editor": {"org-2": "two.example"}}})
+    def test_role_without_any_org_grant_is_ignored(self):
+        self.sync(id_token={ZITADEL_CLAIM: {"admin": {}}})
+        self.user.refresh_from_db()
 
-        self.assertEqual(self.group_names(), {"Editors"})
+        self.assertFalse(self.user.is_superuser)
+        self.assertFalse(self.user.is_staff)
+
+    @override_settings(ZITADEL_ROLE_ORG_ID="")
+    def test_empty_org_id_fails_loudly(self):
+        with self.assertRaisesMessage(ImproperlyConfigured, "ZITADEL_ROLE_ORG_ID"):
+            self.sync(id_token={ZITADEL_CLAIM: {"editor": {"org-2": "two.example"}}})
+
+        self.assertEqual(self.group_names(), set())

@@ -30,6 +30,7 @@ REQUIRED_SETTINGS: dict[str, tuple[str, ...]] = {
         "SOCIAL_AUTH_ZITADEL_DOMAIN",
         "SOCIAL_AUTH_ZITADEL_KEY",
         "SOCIAL_AUTH_ZITADEL_SECRET",
+        "ZITADEL_ROLE_ORG_ID",
     ),
 }
 
@@ -63,11 +64,18 @@ def authentication_backends(providers: list[str]) -> list[str]:
     return backends
 
 
+def _is_missing(value: Any) -> bool:
+    """Unset, empty and whitespace-only values all count as missing."""
+    if isinstance(value, str):
+        return not value.strip()
+    return not value
+
+
 def check_provider_settings(providers: list[str], values: Mapping[str, Any]) -> None:
     """Raise ImproperlyConfigured naming every setting an enabled provider lacks."""
     problems = []
     for provider in providers:
-        missing = [n for n in REQUIRED_SETTINGS[provider] if not values.get(n)]
+        missing = [n for n in REQUIRED_SETTINGS[provider] if _is_missing(values.get(n))]
         if missing:
             problems.append(f"{provider}: {', '.join(missing)}")
     if problems:

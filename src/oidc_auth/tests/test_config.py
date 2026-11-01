@@ -25,6 +25,7 @@ ZITADEL_VALUES = {
     "SOCIAL_AUTH_ZITADEL_DOMAIN": "example.zitadel.cloud",
     "SOCIAL_AUTH_ZITADEL_KEY": "key",
     "SOCIAL_AUTH_ZITADEL_SECRET": "secret",
+    "ZITADEL_ROLE_ORG_ID": "123456789",
 }
 
 
@@ -96,6 +97,28 @@ class CheckProviderSettingsTests(SimpleTestCase):
         values = {**ZITADEL_VALUES, "SOCIAL_AUTH_ZITADEL_KEY": None}
         with self.assertRaises(ImproperlyConfigured):
             check_provider_settings(["zitadel"], values)
+
+    def test_whitespace_only_counts_as_missing(self):
+        cases = [
+            (["zitadel"], ZITADEL_VALUES, "ZITADEL_ROLE_ORG_ID"),
+            (["auth0"], AUTH0_VALUES, "SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET"),
+        ]
+        for providers, base, name in cases:
+            for blank in (" ", "\t\n"):
+                with self.subTest(name=name, value=blank):
+                    with self.assertRaises(ImproperlyConfigured) as ctx:
+                        check_provider_settings(providers, {**base, name: blank})
+                    self.assertIn(name, str(ctx.exception))
+
+    def test_zitadel_role_org_id_is_required(self):
+        values = {**ZITADEL_VALUES}
+        del values["ZITADEL_ROLE_ORG_ID"]
+        with self.assertRaises(ImproperlyConfigured) as ctx:
+            check_provider_settings(["zitadel"], values)
+        self.assertIn("ZITADEL_ROLE_ORG_ID", str(ctx.exception))
+
+    def test_auth0_only_needs_no_zitadel_org_id(self):
+        check_provider_settings(["local", "auth0"], AUTH0_VALUES)
 
     def test_disabled_provider_needs_nothing(self):
         check_provider_settings(["local"], {})

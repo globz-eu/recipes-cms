@@ -243,6 +243,7 @@ class CustomLogoutViewTestCase(TestCase):
 @override_settings(
     SOCIAL_AUTH_ZITADEL_DOMAIN="zitadel.example.com",
     SOCIAL_AUTH_ZITADEL_KEY="zit-client",
+    ZITADEL_ROLE_ORG_ID="org-1",
     SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["static.example.com"],
 )
 @override_settings(AUTH_PROVIDERS=["local", "auth0", "zitadel"])
