@@ -13,12 +13,15 @@ MANAGED_KEYS = (
     "POSTGRES_HOST_PORT",
     "SESSION_COOKIE_NAME",
     "CSRF_COOKIE_NAME",
+    "DEV_FRONTEND_ORIGINS",
 )
 HEADER = "# Local dev stack of this worktree (written by `invoke worktree-env`)"
 MIN_PORT = 1024
 MAX_PORT = 65535
 DEFAULT_NGINX_PORT = 8080
 DEFAULT_POSTGRES_PORT = 5432
+# Vite's default port; the frontend dev server of the main stack.
+DEFAULT_DEV_SERVER_PORT = 5173
 
 
 def default_project_name(directory_name):
@@ -39,19 +42,49 @@ def default_postgres_port(port):
     return port - DEFAULT_NGINX_PORT + DEFAULT_POSTGRES_PORT
 
 
-def check_ports(port, db_port):
-    """Raise ValueError unless both ports are usable for an extra stack."""
-    for label, value, main in (
+def default_dev_server_port(port):
+    """Pair a frontend dev server port with the nginx port (8081 -> 5174)."""
+    return port - DEFAULT_NGINX_PORT + DEFAULT_DEV_SERVER_PORT
+
+
+def dev_frontend_origins(dev_server_port):
+    """Dev server origins to trust: 5173 (any stack) plus this stack's port."""
+    ports = dict.fromkeys((DEFAULT_DEV_SERVER_PORT, dev_server_port))
+    return ",".join(f"http://localhost:{p}" for p in ports)
+
+
+def check_ports(port, db_port, dev_server_port=None, derived=()):
+    """Raise ValueError unless the ports are usable for an extra stack.
+
+    `dev_server_port` (the frontend dev server) may be 5173: it is a valid
+    choice for a single dev server, which then targets this stack. It must not
+    be a host port of this stack or of the main stack. `derived` names the
+    options (`--db-port`, `--dev-server-port`) whose value was derived from
+    `port`; an
+    out-of-range error for them suggests passing the option explicitly.
+    """
+    checks = [
         ("--port", port, DEFAULT_NGINX_PORT),
         ("--db-port", db_port, DEFAULT_POSTGRES_PORT),
-    ):
+    ]
+    if dev_server_port is not None:
+        checks.append(("--dev-server-port", dev_server_port, None))
+    for label, value, main in checks:
         if not MIN_PORT <= value <= MAX_PORT:
             raise ValueError(
                 f"{label} {value} is outside {MIN_PORT}-{MAX_PORT}"
-                + (" (pass --db-port explicitly)" if label == "--db-port" else "")
+                + (f" (pass {label} explicitly)" if label in derived else "")
             )
         if value == main:
             raise ValueError(f"{label} {value} is used by the main stack")
+    if dev_server_port in (DEFAULT_NGINX_PORT, DEFAULT_POSTGRES_PORT):
+        raise ValueError(
+            f"--dev-server-port {dev_server_port} is used by the main stack"
+        )
+    if dev_server_port in (port, db_port):
+        raise ValueError(
+            f"--dev-server-port {dev_server_port} is a host port of this stack"
+        )
 
 
 def _key(line):
@@ -59,13 +92,16 @@ def _key(line):
     return match.group(1) if match else None
 
 
-def rewrite_env(text, name, port, db_port):
+def rewrite_env(text, name, port, db_port, dev_server_port=None):
     """Return `text` with the stack-specific variables set for a worktree.
 
     Existing definitions of the managed variables are replaced, the derived URLs
-    are dropped, everything else is kept as is.
+    are dropped, everything else is kept as is. `dev_server_port` defaults to
+    the port paired with `port` (`default_dev_server_port`).
     """
     name = sanitize_name(name)
+    if dev_server_port is None:
+        dev_server_port = default_dev_server_port(port)
     dropped = set(MANAGED_KEYS) | set(DERIVED_KEYS)
     kept = [
         line
@@ -81,5 +117,6 @@ def rewrite_env(text, name, port, db_port):
         f"POSTGRES_HOST_PORT={db_port}",
         f"SESSION_COOKIE_NAME={name}_sessionid",
         f"CSRF_COOKIE_NAME={name}_csrftoken",
+        f"DEV_FRONTEND_ORIGINS={dev_frontend_origins(dev_server_port)}",
     ]
     return "\n".join([*kept, "", *block]) + "\n"
