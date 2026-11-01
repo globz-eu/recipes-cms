@@ -23,6 +23,7 @@ NEXT = "/frontend/"
     SOCIAL_AUTH_ZITADEL_DOMAIN="zitadel.example.com",
     SOCIAL_AUTH_ZITADEL_KEY="key",
     SOCIAL_AUTH_ZITADEL_SECRET="secret",
+    ZITADEL_ROLE_ORG_ID="org-1",
 )
 class LoginFlowTestCase(TestCase):
     url = "/complete/zitadel/"

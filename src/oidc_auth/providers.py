@@ -40,18 +40,21 @@ def read_zitadel_roles(backend: Any, response: dict[str, Any]) -> set[str]:
     """Zitadel roles: the keys of an object claim. Anything else means no roles.
 
     Each value maps the organisation ids the role was granted in to their
-    domains. With ZITADEL_ROLE_ORG_ID set, only roles granted in that
-    organisation count.
+    domains. Only roles granted in ZITADEL_ROLE_ORG_ID count; malformed grants
+    mean the role doesn't.
     """
+    org_id = settings.ZITADEL_ROLE_ORG_ID
+    if not org_id:
+        raise ImproperlyConfigured(
+            "ZITADEL_ROLE_ORG_ID must be set to sync Zitadel roles to Wagtail groups."
+        )
     raw = read_claim(backend, response, ZITADEL_ROLES_CLAIM)
     if not isinstance(raw, dict):
         return set()
-    org_id = settings.ZITADEL_ROLE_ORG_ID
     return {
         role
         for role, grants in raw.items()
-        if isinstance(role, str)
-        and (not org_id or (isinstance(grants, dict) and org_id in grants))
+        if isinstance(role, str) and isinstance(grants, dict) and org_id in grants
     }
 
 
