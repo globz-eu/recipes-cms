@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Change overview</title>
+<style>
+  :root{color-scheme:light dark;
+    --add:#2e9d44;--addbg:#e3f6e6;--rem:#c83838;--rembg:#fde6e6;--chg:#c98f00;--chgbg:#fff3d1;
+    --unp:#8a3ffc;--unpbg:#f6f0ff;--miss:#777;--same:#9a9aa0;
+    --ink:#1d1d1f;--mute:#6b6b70;--line:#d4d4d8;--bg:#f6f6f7;--panel:#fff;--sunk:#fafafb;--hover:#f0f0f2;
+    --hatch1:#fff;--hatch2:#e6e6e8;--okbg:#eef9f0;--missbg:#f2f2f2}
+  @media (prefers-color-scheme:dark){:root{
+    --add:#4cc364;--addbg:#173222;--rem:#ef6b6b;--rembg:#3a1c1c;--chg:#e8b23a;--chgbg:#3a2f12;
+    --unp:#b184ff;--unpbg:#2a2140;--miss:#9a9aa0;--same:#7d7d84;
+    --ink:#ececee;--mute:#a0a0a8;--line:#3a3a40;--bg:#161618;--panel:#202024;--sunk:#1a1a1d;--hover:#2c2c31;
+    --hatch1:#202024;--hatch2:#2e2e33;--okbg:#17291d;--missbg:#27272b}}
+  *{box-sizing:border-box}
+  body{margin:0;font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);background:var(--bg)}
+  a{color:inherit}
+  code{background:var(--hover);padding:1px 4px;border-radius:3px;font-size:.95em}
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:14px 20px}
+  header h1{margin:0 0 4px;font-size:18px}
+  .meta{color:var(--mute);font-size:12px}
+  .meta span+span::before{content:"|";margin:0 8px}
+  .notes{margin:8px 0 0;padding-left:18px;color:var(--mute);font-size:12px}
+  .counts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .pill{padding:3px 9px;border-radius:12px;font-size:12px;border:1.5px solid var(--line)}
+  .pill.add{border-color:var(--add)}.pill.rem{border-color:var(--rem)}.pill.chg{border-color:var(--chg)}
+  .pill.unp{border-color:var(--unp);color:var(--unp)}.pill.miss{border-color:var(--miss);color:var(--miss)}
+  .noplan{color:var(--unp);font-weight:600}
+  main{padding:16px 20px;max-width:1600px;margin:0 auto}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:16px}
+  section>h2{margin:0 0 10px;font-size:15px}
+  .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  .tabs{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .tabs button{border:0;background:var(--panel);color:var(--ink);padding:5px 12px;cursor:pointer;font-size:12px;border-right:1px solid var(--line)}
+  .tabs button:last-child{border-right:0}
+  .tabs button.on{background:var(--ink);color:var(--panel)}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--mute);margin-bottom:12px}
+  .legend span{display:inline-flex;gap:5px;align-items:center}
+  .sw{width:14px;height:12px;border-radius:3px;border:2px solid var(--same);display:inline-block;background:var(--panel)}
+  .sw.add{border-color:var(--add);background:var(--addbg)}
+  .sw.rem{border-color:var(--rem);background:var(--rembg)}
+  .sw.chg{border-color:var(--chg);background:var(--chgbg)}
+  .sw.unp{outline:2px dashed var(--unp);outline-offset:1px}
+  .sw.miss{border-style:dashed;background:repeating-linear-gradient(45deg,var(--hatch1),var(--hatch1) 3px,var(--hatch2) 3px,var(--hatch2) 6px)}
+  label.chk{font-size:12px;display:inline-flex;gap:5px;align-items:center;cursor:pointer}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .split.one{grid-template-columns:1fr}
+  .colhead{font-weight:600;margin-bottom:6px}
+  .mapwrap{position:relative}
+  .map{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px 22px;position:relative;z-index:1;align-items:start}
+  .grp{border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--sunk)}
+  .grp h4{margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute)}
+  .grp h4 em{font-style:normal;text-transform:none;opacity:.8;letter-spacing:0}
+  .grp .inner{display:flex;flex-direction:column;gap:8px}
+  .c{position:relative;border:2px solid var(--same);background:var(--panel);border-radius:6px;padding:4px 7px;cursor:pointer;font-size:11.5px;transition:opacity .15s}
+  .c small{display:block;color:var(--mute);font-size:10.5px}
+  .c .k{font-size:9.5px;text-transform:uppercase;color:var(--mute);letter-spacing:.04em}
+  .c.added{border-color:var(--add);background:var(--addbg)}
+  .c.removed{border-color:var(--rem);background:var(--rembg)}
+  .c.removed .t{text-decoration:line-through}
+  .c.changed{border-color:var(--chg);background:var(--chgbg)}
+  .c.unplanned{outline:2.5px dashed var(--unp);outline-offset:3px}
+  .c.missing{border-style:dashed;background:repeating-linear-gradient(45deg,var(--hatch1),var(--hatch1) 6px,var(--hatch2) 6px,var(--hatch2) 12px)}
+  .badge{position:absolute;top:-9px;right:6px;font-size:9.5px;font-weight:700;padding:0 5px;border-radius:8px;color:#fff;background:var(--unp)}
+  .badge.miss{background:var(--miss)}
+  .c.dim{opacity:.2}
+  .c.sel{box-shadow:0 0 0 3px var(--ink)}
+  svg.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;overflow:visible}
+  .edge{opacity:.22;transition:opacity .15s}
+  .edge path.line{fill:none;stroke-width:1.5}
+  .edge path.hit{fill:none;stroke:transparent;stroke-width:10;pointer-events:stroke}
+  .edge text{font-size:10px;fill:var(--ink);paint-order:stroke;stroke:var(--panel);stroke-width:4px;display:none;pointer-events:none}
+  .edge:hover,.edge.on{opacity:1}
+  .edge:hover text,.edge.on text{display:block}
+  .edge.dim{opacity:.07}
+  .edge.dim:hover{opacity:.07}
+  .edge.dim:hover text{display:none}
+  .detail{margin-top:12px;border:1px solid var(--line);border-radius:6px;padding:10px;background:var(--sunk);min-height:60px}
+  .detail h3{margin:0 0 4px;font-size:14px}
+  .detail .dm{font-size:11.5px;color:var(--mute);margin-bottom:6px}
+  .detail .plan{border-left:3px solid var(--unp);padding:4px 8px;background:var(--unpbg);margin-top:6px}
+  .detail .plan.ok{border-color:var(--add);background:var(--okbg)}
+  .detail .plan.gone{border-color:var(--miss);background:var(--missbg)}
+  .hint{color:var(--mute)}
+
+  .flowsplit{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .flowsplit.one{grid-template-columns:1fr}
+  svg.seq{display:block;width:100%;height:auto}
+  svg.seq text{font-size:11px;fill:var(--ink)}
+  svg.seq .lane{font-weight:600;font-size:11.5px}
+  svg.seq .halo{paint-order:stroke;stroke:var(--panel);stroke-width:3px}
+  svg.seq .lifeline{stroke:var(--line);stroke-dasharray:3 3}
+  .st-added{fill:var(--add)!important;stroke:var(--add)}.st-removed{fill:var(--rem)!important;stroke:var(--rem)}
+  .st-changed{fill:var(--chg)!important;stroke:var(--chg)}.st-unchanged{fill:var(--ink);stroke:var(--same)}
+  svg.seq text.st-added,svg.seq text.st-removed,svg.seq text.st-changed{stroke:var(--panel)}
+  svg .tag-unp{fill:var(--unp)!important;font-weight:600}svg .tag-miss{fill:var(--miss)!important;font-weight:600}
+  svg .was{fill:var(--mute)!important;font-size:10px}
+  table{border-collapse:collapse;width:100%;font-size:12.5px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;text-transform:uppercase;color:var(--mute)}
+  .res{font-weight:600;white-space:nowrap}
+  .res.done{color:var(--add)}.res.differently,.res.notinplan{color:var(--unp)}.res.notdone{color:var(--miss)}
+  @media (max-width:1000px){.split,.flowsplit{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title"></h1>
+  <div class="meta" id="meta"></div>
+  <ul class="notes" id="notes"></ul>
+  <div class="counts" id="counts"></div>
+</header>
+<main>
+  <section id="mapSection">
+    <h2>Where the change lands</h2>
+    <div class="bar">
+      <label class="chk"><input type="checkbox" id="onlyChanged"> hide unchanged parts</label>
+      <label class="chk" id="devLabel"><input type="checkbox" id="onlyDev"> only show differences from the plan</label>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div id="mapArea"></div>
+    <div class="detail" id="detail"></div>
+  </section>
+  <section id="flowSection">
+    <h2>How the flow changes</h2>
+    <div class="bar"><span class="tabs" id="flowpick"></span></div>
+    <div id="flowArea"></div>
+  </section>
+  <section id="planSection">
+    <h2>Plan compared with the result</h2>
+    <table id="plantable"></table>
+  </section>
+</main>
+
+<script type="application/json" id="change-data">{"title": "Request the Zitadel org scope at login (recipes-cms #28)", "kind": "plan", "planFound": true, "context": "~/.claude/architectures/recipes.md", "sources": [{"label": "recipes-cms docs/plans/2026-11-02-zitadel-org-scope.md"}], "notes": ["Plan is an untracked local file in recipes-cms.", "recipes-infrastructure and recipes-frontend not read; their rows come from the plan's follow-ups only.", "Open: whether Zitadel asserts urn:zitadel:iam:user:resourceowner:id (plan open question 1)."], "groups": [{"id": "cms", "title": "recipes-cms", "kind": "repo"}, {"id": "infra", "title": "recipes-infrastructure", "kind": "repo"}, {"id": "fe", "title": "recipes-frontend", "kind": "repo"}, {"id": "ext", "title": "External", "kind": "external"}], "components": [{"id": "backend", "group": "cms", "name": "ZitadelOpenIdConnect", "type": "oidc_auth backend", "status": "changed", "summary": "Appends org-id scope to requested scopes", "before": "Scopes: openid profile email roles", "details": "get_scope() override reads settings.ZITADEL_ROLE_ORG_ID, de-duplicates, raises ImproperlyConfigured when blank, keeps the org scope even with IGNORE_DEFAULT_SCOPE.", "files": ["src/oidc_auth/backends.py", "src/oidc_auth/tests/test_backends.py"], "planSays": "Increment 1: override get_scope()."}, {"id": "pipe", "group": "cms", "name": "enforce_zitadel_org", "type": "social-auth pipeline step", "status": "added", "summary": "Refuses token with foreign resource owner", "details": "No-op unless backend is zitadel. Reads resourceowner claim via read_claim; mismatch raises OrgMismatch; absent logs a warning and continues. Inserted after auth_allowed in SOCIAL_AUTH_PIPELINE.", "files": ["src/oidc_auth/pipeline.py", "src/oidc_auth/providers.py", "src/oidc_auth/exceptions.py", "src/recipe_cms/settings/base.py", "src/oidc_auth/tests/test_pipeline.py", "src/oidc_auth/tests/test_login_flow.py"], "planSays": "Increment 2."}, {"id": "mw", "group": "cms", "name": "LoginRefusedMiddleware", "type": "middleware", "status": "unchanged", "summary": "Redirects with auth_error=org_mismatch", "details": "Handles every LoginRefused, so the new OrgMismatch code needs no change.", "files": ["src/oidc_auth/middleware.py"]}, {"id": "docs", "group": "cms", "name": "README and CLAUDE.md", "type": "docs", "status": "changed", "summary": "Document org scope, org_mismatch, dev ports", "files": ["README.md", "CLAUDE.md"], "planSays": "Increment 3."}, {"id": "zit", "group": "infra", "name": "Zitadel stack org policy", "type": "Pulumi (src/zitadel.ts)", "status": "unchanged", "summary": "Org login settings now applied via scope", "details": "Follow-up: reword README and docs/staging-bootstrap.md step 6 after a CMS release ships; note forceMfa result in issue #6.", "files": ["src/zitadel.ts", "docs/staging-bootstrap.md"], "planSays": "Follow-ups"}, {"id": "fe", "group": "fe", "name": "AUTH_ERROR_MESSAGES", "type": "auth error mapping", "status": "changed", "summary": "Optional org_mismatch message", "details": "Unknown codes already fall back to login_failed.", "files": ["src/auth/urls.ts"], "planSays": "Follow-ups: optional."}, {"id": "zid", "group": "ext", "name": "Zitadel login UI", "type": "external service", "status": "unchanged", "summary": "Uses stack org settings, admits only its users", "details": "With the org-id scope Zitadel applies the org's login policy and branding and refuses non-members inside its own UI."}], "connections": [{"from": "backend", "to": "zid", "label": "scope urn:zitadel:iam:org:id:<id>", "status": "changed"}, {"from": "zid", "to": "pipe", "label": "ID token with resourceowner claim", "status": "unchanged"}, {"from": "pipe", "to": "mw", "label": "OrgMismatch (LoginRefused)", "status": "added"}, {"from": "mw", "to": "fe", "label": "auth_error=org_mismatch", "status": "added"}, {"from": "zit", "to": "zid", "label": "org policy and branding", "status": "unchanged"}], "flows": [{"title": "Zitadel login", "kind": "user", "lanes": ["Browser", "recipes-cms", "Zitadel"], "steps": [{"from": 0, "to": 1, "label": "GET /login/zitadel/", "status": "unchanged"}, {"from": 1, "to": 0, "label": "redirect to Zitadel with org-id scope", "before": "redirect without org scope", "status": "changed"}, {"from": 0, "to": 2, "label": "sign in under stack org settings", "before": "sign in under instance defaults", "status": "changed"}, {"from": 2, "to": 1, "label": "callback with code", "status": "unchanged"}, {"from": 1, "to": 1, "label": "enforce_zitadel_org checks resource owner", "status": "added"}, {"from": 1, "to": 0, "label": "redirect with auth_error=org_mismatch on mismatch", "status": "added"}]}], "planComparison": []}</script>
+<script>
+(function(){
+const D=JSON.parse(document.getElementById('change-data').textContent);
+const groups=D.groups||[], comps=D.components||[], conns=D.connections||[], flows=D.flows||[], rows=D.planComparison||[];
+const hasPlan=D.kind==='merge-request'&&D.planFound===true;
+const noPlan=D.kind==='merge-request'&&D.planFound!==true;
+const esc=x=>String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const $=id=>document.getElementById(id);
+const byId=Object.fromEntries(comps.map(c=>[c.id,c]));
+const groupOf=id=>groups.find(g=>g.id===id)||{title:id};
+const plan=x=>hasPlan?(x.plan||null):null;
+const isDev=x=>{const p=plan(x);return p&&p!=='planned';};
+const STATUS={added:'Added',removed:'Removed',changed:'Changed',unchanged:'Unchanged'};
+let selected=null, flowIdx=0;
+
+// Before view is left out when nothing existed before.
+const showBefore=!comps.every(c=>c.status==='added');
+const flowHasBefore=f=>!f.steps.every(s=>s.status==='added');
+
+// ----- header -----
+$('title').textContent=D.title||'Change overview';
+document.title=D.title||'Change overview';
+(function(){
+  const parts=[];
+  if((D.sources||[]).length) parts.push('<span>'+(D.kind==='plan'?'Plans: ':'Merge requests: ')+D.sources.map(s=>/^https?:\/\//.test(s.url||'')?`<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.label)}</a>`:esc(s.label)).join(' · ')+'</span>');
+  if(D.context) parts.push(`<span>Context: <code>${esc(D.context)}</code></span>`);
+  if(noPlan) parts.push('<span class="noplan">no plan found</span>');
+  $('meta').innerHTML=parts.join('');
+  $('notes').innerHTML=(D.notes||[]).map(n=>`<li>${esc(n)}</li>`).join('');
+  const n=s=>comps.filter(c=>c.status===s&&plan(c)!=='missing').length;
+  const p=s=>comps.filter(c=>plan(c)===s).length;
+  let h=`<span class="pill add">${n('added')} added</span><span class="pill rem">${n('removed')} removed</span><span class="pill chg">${n('changed')} changed</span>`;
+  if(hasPlan) h+=`<span class="pill unp">${p('unplanned')+p('differs')} differ from the plan</span><span class="pill miss">${p('missing')} planned but missing</span>`;
+  $('counts').innerHTML=h;
+  let l='<span><i class="sw add"></i>added</span><span><i class="sw rem"></i>removed (kept, struck through)</span><span><i class="sw chg"></i>changed</span>';
+  if(hasPlan) l+='<span><i class="sw unp"></i>not in the plan / differs</span><span><i class="sw miss"></i>planned, but missing</span>';
+  l+='<span>click a box for details, hover a line for its label</span>';
+  $('legend').innerHTML=l;
+  if(!hasPlan){$('devLabel').style.display='none';$('planSection').style.display='none';}
+  if(!flows.length) $('flowSection').style.display='none';
+  if(!comps.length) $('mapSection').style.display='none';
+})();
+
+// ----- map -----
+function visible(c,mode){
+  if(mode==='before'&&c.status==='added') return false;
+  if($('onlyChanged').checked&&c.status==='unchanged') return false;
+  if(hasPlan&&$('onlyDev').checked&&!isDev(c)) return false;
+  return true;
+}
+function mapHTML(mode){
+  let h='<div class="mapwrap"><svg class="edges"></svg><div class="map">';
+  for(const g of groups){
+    const cs=comps.filter(c=>c.group===g.id&&visible(c,mode));
+    if(!cs.length) continue;
+    const tag=g.kind==='external'?' <em>(external)</em>':(g.kind==='runtime'?' <em>(runtime)</em>':'');
+    h+=`<div class="grp"><h4>${esc(g.title)}${tag}</h4><div class="inner">`;
+    for(const c of cs){
+      const after=mode==='after', p=plan(c);
+      const cls=after?[c.status!=='unchanged'?c.status:'',p==='unplanned'||p==='differs'?'unplanned':'',p==='missing'?'missing':'']:[];
+      const badge=!after?'':p==='missing'?'<span class="badge miss">MISSING</span>':p==='unplanned'?'<span class="badge">NOT IN PLAN</span>':p==='differs'?'<span class="badge">DIFFERS</span>':'';
+      h+=`<div class="c ${cls.join(' ')}" data-id="${esc(c.id)}">${badge}<div class="k">${esc(c.type)}</div><div class="t">${esc(c.name)}</div>${(()=>{const t=!after&&c.before?c.before:c.summary;return t?`<small>${esc(t)}</small>`:'';})()}</div>`;
+    }
+    h+='</div></div>';
+  }
+  return h+'</div></div>';
+}
+function drawEdges(wrap,mode,uid){
+  const svg=wrap.querySelector('svg.edges'), base=wrap.getBoundingClientRect();
+  const colors={added:'var(--add)',removed:'var(--rem)',changed:'var(--chg)',unchanged:'var(--same)'};
+  let out='<defs>'+Object.entries(colors).map(([k,v])=>`<marker id="ar-${k}-${uid}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="${v}"/></marker>`).join('')+'</defs>';
+  for(const e of conns){
+    if(mode==='before'&&e.status==='added') continue;
+    const a=wrap.querySelector(`.c[data-id="${CSS.escape(e.from)}"]`), b=wrap.querySelector(`.c[data-id="${CSS.escape(e.to)}"]`);
+    if(!a||!b) continue;
+    const r1=a.getBoundingClientRect(), r2=b.getBoundingClientRect();
+    let x1,y1,x2,y2;
+    if(r2.left>r1.right+4){x1=r1.right;y1=r1.top+r1.height/2;x2=r2.left;y2=r2.top+r2.height/2;}
+    else if(r1.left>r2.right+4){x1=r1.left;y1=r1.top+r1.height/2;x2=r2.right;y2=r2.top+r2.height/2;}
+    else if(r2.top>r1.bottom){x1=r1.left+r1.width/2;y1=r1.bottom;x2=r2.left+r2.width/2;y2=r2.top;}
+    else{x1=r1.left+r1.width/2;y1=r1.top;x2=r2.left+r2.width/2;y2=r2.bottom;}
+    x1-=base.left;x2-=base.left;y1-=base.top;y2-=base.top;
+    const horiz=Math.abs(x2-x1)>Math.abs(y2-y1);
+    const d=horiz?`M${x1},${y1} C${(x1+x2)/2},${y1} ${(x1+x2)/2},${y2} ${x2},${y2}`:`M${x1},${y1} C${x1},${(y1+y2)/2} ${x2},${(y1+y2)/2} ${x2},${y2}`;
+    const st=mode==='before'?'unchanged':e.status, p=mode==='before'?null:plan(e);
+    const dash=st==='removed'?'6 4':(p==='missing'?'2 4':'');
+    const glow=p==='unplanned'||p==='differs'?`<path d="${d}" stroke="var(--unp)" stroke-width="5" opacity=".3" fill="none"/>`:'';
+    out+=`<g class="edge" data-f="${esc(e.from)}" data-t="${esc(e.to)}">${glow}<path class="line" d="${d}" stroke="${colors[st]}" stroke-dasharray="${dash}" marker-end="url(#ar-${st}-${uid})"/><path class="hit" d="${d}"/><text x="${(x1+x2)/2}" y="${(y1+y2)/2-4}" text-anchor="middle">${esc(e.label)}</text></g>`;
+  }
+  svg.innerHTML=out;
+}
+function renderMap(){
+  const area=$('mapArea');
+  area.innerHTML=`<div class="split ${showBefore?'':'one'}">`+(showBefore?`<div><div class="colhead">Before</div>${mapHTML('before')}</div>`:'')+`<div><div class="colhead">${showBefore?'After, with differences highlighted':'What the change adds'}</div>${mapHTML('after')}</div></div>`;
+  area.querySelectorAll('.c').forEach(el=>el.onclick=()=>select(el.dataset.id));
+  layoutEdges();
+  applySel();
+}
+function layoutEdges(){
+  const area=$('mapArea');
+  area.querySelectorAll('.mapwrap').forEach((w,i)=>drawEdges(w,showBefore&&i===0?'before':'after',i));
+  applySel();
+}
+function select(id){selected=selected===id?null:id;applySel();}
+function applySel(){
+  const area=$('mapArea');
+  const linked=new Set([selected]);
+  if(selected) conns.forEach(e=>{if(e.from===selected)linked.add(e.to);if(e.to===selected)linked.add(e.from);});
+  area.querySelectorAll('.c').forEach(el=>{el.classList.toggle('dim',!!selected&&!linked.has(el.dataset.id));el.classList.toggle('sel',el.dataset.id===selected);});
+  area.querySelectorAll('.edge').forEach(el=>{const t=!!selected&&(el.dataset.f===selected||el.dataset.t===selected);el.classList.toggle('on',t);el.classList.toggle('dim',!!selected&&!t);});
+  const d=$('detail'), c=byId[selected];
+  if(!c){d.innerHTML='<span class="hint">Click a component to see what changed, where'+(hasPlan?', and what the plan said':'')+'.</span>';return;}
+  const p=plan(c);
+  const pl={planned:['ok','As planned'],unplanned:['','Not in the plan'],differs:['','Differs from the plan'],missing:['gone','Planned, but missing from the merge requests']}[p];
+  const meta=[STATUS[c.status],groupOf(c.group).title].map(esc);
+  if((c.files||[]).length) meta.push(c.files.map(f=>`<code>${esc(f)}</code>`).join(' '));
+  if((c.refs||[]).length) meta.push(c.refs.map(esc).join(', '));
+  d.innerHTML=`<h3>${esc(c.name)}</h3><div class="dm">${meta.join(' · ')}</div>${c.before?`<div><b>Before:</b> ${esc(c.before)}</div>`:''}${c.summary?`<div>${esc(c.summary)}</div>`:''}${c.details?`<div>${esc(c.details)}</div>`:''}${pl?`<div class="plan ${pl[0]}"><b>${pl[1]}.</b> ${esc(c.planSays||'')}</div>`:''}`;
+}
+
+// ----- flows -----
+function wrap(text,max){
+  const out=[];let cur='';
+  for(const w of String(text).split(/\s+/)){
+    if(cur&&(cur+' '+w).length>max){out.push(cur);cur=w;}else cur=cur?cur+' '+w:w;
+  }
+  if(cur) out.push(cur);
+  return out.length?out:[''];
+}
+function seqSVG(flow,mode,uid){
+  const W=760, n=flow.lanes.length, x0=70, x1=W-70;
+  const lx=i=>n===1?W/2:x0+i*(x1-x0)/(n-1);
+  const LH=13, steps=flow.steps.filter(s=>!(mode==='before'&&s.status==='added'));
+  const items=[];let y=44;
+  for(const s of steps){
+    const self=s.from===s.to, left=Math.min(lx(s.from),lx(s.to)), right=Math.max(lx(s.from),lx(s.to));
+    let tag='';
+    if(mode==='after'&&hasPlan){const p=plan(s);if(p==='unplanned')tag=['not in plan','tag-unp'];if(p==='missing')tag=['planned, not built','tag-miss'];}
+    const label=mode==='before'&&s.before?s.before:s.label;
+    const full=label+(tag?' ['+tag[0]+']':'');
+    const width=self?W-lx(s.from)-40:Math.max(right-left,230);
+    const lines=wrap(full,Math.floor(width/5.8));
+    const was=mode==='after'&&s.before?wrap('was: '+s.before,Math.floor(width/5.4)):[];
+    const total=lines.length+was.length;
+    items.push({s,self,left,right,lines,was,tag,y:y+lines.length*LH-LH+8});
+    y+=total*LH+16+(was.length?8:0);
+  }
+  const H=y+12;
+  const cols={added:'var(--add)',removed:'var(--rem)',changed:'var(--chg)',unchanged:'var(--same)'};
+  let o=`<svg class="seq" viewBox="0 0 ${W} ${H}"><defs>`+Object.entries(cols).map(([k,v])=>`<marker id="sq-${k}-${uid}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="${v}"/></marker>`).join('')+'</defs>';
+  flow.lanes.forEach((l,i)=>{o+=`<text class="lane" x="${lx(i)}" y="20" text-anchor="middle">${esc(l)}</text><line class="lifeline" x1="${lx(i)}" y1="28" x2="${lx(i)}" y2="${H-8}"/>`;});
+  for(const it of items){
+    const s=it.s, st=mode==='before'?'unchanged':s.status, c=cols[st], p=mode==='after'?plan(s):null;
+    const dash=st==='removed'?'6 4':(p==='missing'?'2 4':'');
+    const ay=it.y;
+    let tx,ty,anchor;
+    if(it.self){
+      const x=lx(s.from);
+      o+=`<path d="M${x},${ay-6} h26 v12 h-24" fill="none" stroke="${c}" stroke-width="1.6" stroke-dasharray="${dash}" marker-end="url(#sq-${st}-${uid})"/>`;
+      tx=x+32;anchor='start';
+    } else {
+      const xa=lx(s.from), xb=lx(s.to);
+      o+=`<line x1="${xa}" y1="${ay}" x2="${xb+(xb>xa?-2:2)}" y2="${ay}" stroke="${c}" stroke-width="1.6" stroke-dasharray="${dash}" marker-end="url(#sq-${st}-${uid})"/>`;
+      tx=Math.min(Math.max((it.left+it.right)/2,115),W-115);anchor='middle';
+    }
+    const top=ay-6-(it.lines.length-1)*LH;
+    const cls=`halo ${mode==='before'||st==='unchanged'?'':'st-'+st}`;
+    const deco=st==='removed'&&mode==='after'?' text-decoration="line-through"':'';
+    let t=`<text x="${tx}" y="${top}" text-anchor="${anchor}" class="${cls}"${deco}>`;
+    it.lines.forEach((ln,i)=>{
+      const last=i===it.lines.length-1;
+      let body=esc(ln);
+      if(last&&it.tag){const k=ln.lastIndexOf(' ['+it.tag[0]+']');if(k>=0)body=esc(ln.slice(0,k))+`<tspan class="${it.tag[1]}"> [${esc(it.tag[0])}]</tspan>`;}
+      t+=`<tspan x="${tx}" dy="${i?LH:0}">${body}</tspan>`;
+    });
+    o+=t+'</text>';
+    if(it.was.length){
+      o+=`<text class="halo was" x="${tx}" y="${ay+16}" text-anchor="${anchor}" text-decoration="line-through">`+it.was.map((ln,i)=>`<tspan x="${tx}" dy="${i?LH:0}">${esc(ln)}</tspan>`).join('')+'</text>';
+    }
+  }
+  return o+'</svg>';
+}
+function renderFlow(){
+  if(!flows.length) return;
+  const f=flows[flowIdx]||flows[0];
+  const pick=$('flowpick');
+  pick.style.display=flows.length>1?'':'none';
+  pick.innerHTML=flows.map((x,i)=>`<button data-i="${i}" class="${i===flowIdx?'on':''}">${esc(x.title)}</button>`).join('');
+  pick.querySelectorAll('button').forEach(b=>b.onclick=()=>{flowIdx=+b.dataset.i;renderFlow();});
+  const before=flowHasBefore(f);
+  $('flowArea').innerHTML=`<div class="flowsplit ${before?'':'one'}">`+(before?`<div><div class="colhead">Before</div>${seqSVG(f,'before',0)}</div>`:'')+`<div><div class="colhead">${before?'After, with differences highlighted':'What the change adds'}</div>${seqSVG(f,'after',1)}</div></div>`;
+}
+
+// ----- plan table -----
+function renderPlan(){
+  if(!hasPlan) return;
+  const cls={'done':'done','done differently':'differently','not done':'notdone','not in plan':'notinplan'};
+  $('plantable').innerHTML='<tr><th>Plan said</th><th>Result</th><th>Repo</th><th>Notes</th></tr>'+
+    rows.map(r=>`<tr><td>${r.planItem?esc(r.planItem):'<span class="hint">not in the plan</span>'}</td><td class="res ${cls[r.result]||''}">${esc(r.result)}</td><td>${esc(r.repo||'')}</td><td>${esc(r.note||'')}</td></tr>`).join('');
+}
+
+$('onlyChanged').onchange=renderMap;
+$('onlyDev').onchange=renderMap;
+let rt=null;
+window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(layoutEdges,80);});
+renderMap();renderFlow();renderPlan();
+window.addEventListener('load',layoutEdges);
+})();
+</script>
+</body>
+</html>
