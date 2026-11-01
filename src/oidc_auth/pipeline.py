@@ -11,14 +11,20 @@ from django.core.exceptions import ImproperlyConfigured
 from social_core.exceptions import AuthAlreadyAssociated
 from social_core.pipeline.user import create_user as social_create_user
 
+from oidc_auth.backends import ZitadelOpenIdConnect
 from oidc_auth.exceptions import (
     AlreadySignedIn,
     EmailMissing,
     EmailNotVerified,
     EmailOwnedElsewhere,
+    OrgMismatch,
 )
 from oidc_auth.ownership import email_owner
-from oidc_auth.providers import provider_for_backend, read_claim
+from oidc_auth.providers import (
+    ZITADEL_RESOURCE_OWNER_CLAIM,
+    provider_for_backend,
+    read_claim,
+)
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -32,6 +38,32 @@ def _is_verified(value: Any) -> bool:
     if isinstance(value, str):
         return value.lower() == "true"
     return value is True
+
+
+def enforce_zitadel_org(
+    backend: Any, response: dict[str, Any], *args: Any, **kwargs: Any
+) -> None:
+    """
+    Refuse a Zitadel login whose user is owned by another org (``OrgMismatch``).
+
+    Defence in depth behind the org scope requested by ``ZitadelOpenIdConnect``,
+    which already makes Zitadel admit only users of ZITADEL_ROLE_ORG_ID. Runs
+    before ``social_user``, so nothing is looked up or created for a foreign
+    user. A missing resource owner claim is logged and the login proceeds.
+    Other providers are not checked.
+    """
+    if backend.name != ZitadelOpenIdConnect.name:
+        return None
+    owner = read_claim(backend, response, ZITADEL_RESOURCE_OWNER_CLAIM)
+    if owner is None:
+        logger.warning(
+            "Zitadel login without %s claim; org not checked",
+            ZITADEL_RESOURCE_OWNER_CLAIM,
+        )
+        return None
+    if owner != settings.ZITADEL_ROLE_ORG_ID:
+        raise OrgMismatch(backend)
+    return None
 
 
 def enforce_email_ownership(

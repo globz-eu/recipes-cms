@@ -75,6 +75,39 @@ class LoginFlowTestCase(TestCase):
         self.assertFalse(UserSocialAuth.objects.exists())
         self.assertNotIn("_auth_user_id", self.client.session)
 
+    def test_user_of_another_org_is_refused_before_creating_anything(self):
+        response = self.complete(
+            {
+                "sub": "uid-1",
+                "email": EMAIL,
+                "email_verified": True,
+                "urn:zitadel:iam:user:resourceowner:id": "org-2",
+            }
+        )
+
+        self.assertRedirects(
+            response,
+            f"{NEXT}?auth_error=org_mismatch",
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(User.objects.exists())
+        self.assertFalse(UserSocialAuth.objects.exists())
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_user_of_the_org_creates_user_and_logs_in(self):
+        response = self.complete(
+            {
+                "sub": "uid-1",
+                "email": EMAIL,
+                "email_verified": True,
+                "urn:zitadel:iam:user:resourceowner:id": "org-1",
+            }
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn("auth_error", response["Location"])
+        self.assertTrue(User.objects.filter(email=EMAIL).exists())
+
     def test_verified_new_email_creates_user_and_logs_in(self):
         response = self.complete(
             {"sub": "uid-1", "email": EMAIL, "email_verified": True}

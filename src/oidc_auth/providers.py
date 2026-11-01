@@ -13,6 +13,7 @@ from social_django.models import UserSocialAuth
 from oidc_auth.config import AUTH0, LOCAL, ZITADEL
 
 ZITADEL_ROLES_CLAIM = "urn:zitadel:iam:org:project:roles"
+ZITADEL_RESOURCE_OWNER_CLAIM = "urn:zitadel:iam:user:resourceowner:id"
 
 
 def read_claim(backend: Any, response: dict[str, Any], claim: str) -> Any:

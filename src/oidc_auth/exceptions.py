@@ -36,3 +36,8 @@ class AlreadySignedIn(LoginRefused):
     message = (
         "You are already signed in. Sign out first to use a different sign-in method."
     )
+
+
+class OrgMismatch(LoginRefused):
+    code = "org_mismatch"
+    message = "This account does not belong to this site's sign-in organisation."

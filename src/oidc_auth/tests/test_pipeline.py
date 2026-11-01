@@ -3,9 +3,10 @@ from unittest.mock import Mock
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 
-from oidc_auth.pipeline import sync_roles
+from oidc_auth.exceptions import OrgMismatch
+from oidc_auth.pipeline import enforce_zitadel_org, sync_roles
 
 User = get_user_model()
 
@@ -249,3 +250,44 @@ class SyncZitadelRolesTestCase(TestCase):
             self.sync(id_token={ZITADEL_CLAIM: {"editor": {"org-2": "two.example"}}})
 
         self.assertEqual(self.group_names(), set())
+
+
+OWNER_CLAIM = "urn:zitadel:iam:user:resourceowner:id"
+
+
+@override_settings(ZITADEL_ROLE_ORG_ID="org-1")
+class EnforceZitadelOrgTestCase(SimpleTestCase):
+    def enforce(self, *, response=None, id_token=None, name="zitadel"):
+        backend = Mock()
+        backend.name = name
+        backend.id_token = id_token if id_token is not None else {}
+        return enforce_zitadel_org(backend, response or {})
+
+    def test_matching_org_passes(self):
+        self.assertIsNone(self.enforce(id_token={OWNER_CLAIM: "org-1"}))
+
+    def test_other_org_is_refused(self):
+        with self.assertRaises(OrgMismatch):
+            self.enforce(id_token={OWNER_CLAIM: "org-2"})
+
+    def test_falls_back_to_response(self):
+        with self.assertRaises(OrgMismatch):
+            self.enforce(response={OWNER_CLAIM: "org-2"})
+
+    def test_id_token_is_preferred_over_response(self):
+        self.assertIsNone(
+            self.enforce(
+                id_token={OWNER_CLAIM: "org-1"}, response={OWNER_CLAIM: "org-2"}
+            )
+        )
+
+    def test_missing_claim_passes_with_a_warning(self):
+        with self.assertLogs("oidc_auth.pipeline", "WARNING") as logs:
+            self.assertIsNone(self.enforce())
+
+        self.assertIn(OWNER_CLAIM, logs.output[0])
+
+    def test_auth0_logins_are_not_checked(self):
+        self.assertIsNone(
+            self.enforce(id_token={OWNER_CLAIM: "org-2"}, name="auth0_openidconnect")
+        )
