@@ -1,6 +1,7 @@
 """Social login through the real URL, pipeline and LoginRefusedMiddleware."""
 
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
@@ -43,6 +44,20 @@ class LoginFlowTestCase(TestCase):
             ),
         ):
             return self.client.get(self.url)
+
+    def test_login_requests_the_org_scope(self):
+        config = {"authorization_endpoint": "https://zitadel.example.com/authorize"}
+        with patch.object(ZitadelOpenIdConnect, "oidc_config", lambda self: config):
+            response = self.client.get("/login/zitadel/")
+
+        self.assertEqual(response.status_code, 302)
+        location = urlsplit(response["Location"])
+        self.assertEqual(
+            f"{location.scheme}://{location.netloc}{location.path}",
+            config["authorization_endpoint"],
+        )
+        scope = parse_qs(location.query)["scope"][0].split(" ")
+        self.assertIn("urn:zitadel:iam:org:id:org-1", scope)
 
     def test_email_owned_by_another_user_is_refused_before_creating_anything(self):
         User.objects.create_user("local", email=EMAIL, password="x")
