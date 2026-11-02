@@ -196,6 +196,8 @@ SOCIAL_AUTH_PIPELINE = (
     # project, this is where emails and domains whitelists are applied (if
     # defined).
     "social_core.pipeline.social_auth.auth_allowed",
+    # Refuse a Zitadel user owned by another org than ZITADEL_ROLE_ORG_ID.
+    "oidc_auth.pipeline.enforce_zitadel_org",
     # Checks if the current social-account is already associated in the site.
     "social_core.pipeline.social_auth.social_user",
     # Refuse the login unless the verified email belongs to no other account

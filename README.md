@@ -237,7 +237,7 @@ uv run invoke dev
 
 - `uv run invoke test` works in each stack (each has its own database). Each stack has its own empty Garage, so uploads and browsing media both need the Garage provisioning below (worktree variant: import the copied keys).
 - Port pairs: extra stacks use nginx ports 8081-8089, each paired with a frontend dev server port (8081 -> 5174, ..., 8089 -> 5182); recipes-frontend and recipes-infrastructure use the same pairs. A `.env` written before `DEV_FRONTEND_ORIGINS` existed trusts only 5173: rerun `worktree-env --force` or add the line by hand.
-- Limits: social login (Auth0) works on nginx ports 8080-8089, which the recipes-infrastructure dev stack registers as callbacks; other ports need a `localExtraPorts` entry in recipes-infrastructure and `pulumi up --stack dev` there. Local/dev login works on any port. The frontend dev server follows the stack: run `RECIPES_CMS_PORT=8081 npm run dev` in recipes-frontend to proxy to the stack on 8081 and serve on its paired port (http://localhost:5174/frontend/), the origin the stack trusts; `DEV_SERVER_PORT` overrides the port and `RECIPES_CMS_URL` targets any other backend.
+- Limits: social login (Auth0, and Zitadel once the dev stack enables it) works on nginx ports 8080-8089, which the recipes-infrastructure dev stack registers as callbacks; other ports need a `localExtraPorts` entry in recipes-infrastructure and `pulumi up --stack dev` there. Local/dev login works on any port. The frontend dev server follows the stack: run `RECIPES_CMS_PORT=8081 npm run dev` in recipes-frontend to proxy to the stack on 8081 and serve on its paired port (http://localhost:5174/frontend/), the origin the stack trusts; `DEV_SERVER_PORT` overrides the port and `RECIPES_CMS_URL` targets any other backend.
 - Cookies are scoped per host, not per port; the distinct cookie names keep the stacks' sessions apart in one browser.
 - Whoever starts a stack stops it, see "Stopping the Stack".
 
@@ -461,6 +461,7 @@ Releases are built by CI on `v*.*.*` tags (`invoke bump`); see the infrastructur
 
 1. User navigates to `/admin/` and picks an enabled sign-in method (or the frontend starts the login at a `login_url` from `/api/auth/providers/`)
 2. Social login: the user authenticates at Auth0 or Zitadel and returns to `/complete/<backend>/`. The social auth pipeline then:
+   - For Zitadel, refuses the login unless the user belongs to the organisation `ZITADEL_ROLE_ORG_ID` (`org_mismatch`)
    - Refuses the login unless the provider reports a verified email that belongs to no other account (see below)
    - Creates a new Django user if needed
    - Reads the roles from the ID token (Auth0: the claim named by `AUTH0_ROLES_CLAIM`; Zitadel: `urn:zitadel:iam:org:project:roles`)
@@ -475,7 +476,9 @@ A social login is refused when the provider sends no email (`email_missing`), wh
 email is unverified (`email_unverified`), when it is already owned by another account or
 sign-in method (`email_in_use`), or when a user who is already signed in starts a social
 login (`already_signed_in`; they must sign out first). The same code is used when the
-provider identity is already linked to a different user. Any other failed provider login
+provider identity is already linked to a different user. A Zitadel login is refused with
+`org_mismatch` when the user's organisation (the `urn:zitadel:iam:user:resourceowner:id`
+claim) is missing or is not `ZITADEL_ROLE_ORG_ID`. Any other failed provider login
 (cancelled or forbidden, for example the user denies consent, a lost login state or a
 token error) gives the generic `login_failed`. For an existing association the email the
 provider reports at each login is checked; the stored email is never refreshed from the
@@ -543,9 +546,13 @@ unless they hold the `admin` role.
 3. Create a Web application in the project (authentication method Code, with a client secret).
    In its settings enable "User roles inside ID Token" and "User Info inside ID Token" (the latter
    puts `email` and `email_verified` into the ID token). The `urn:zitadel:iam:org:project:roles`
-   scope is requested automatically.
+   scope, `urn:zitadel:iam:org:id:<ZITADEL_ROLE_ORG_ID>` and `urn:zitadel:iam:user:resourceowner`
+   are requested automatically.
 4. Redirect URI: `https://<host>/complete/zitadel/` (e.g. `http://localhost:8080/complete/zitadel/`
-   locally; registered for port 8080 only). Post-logout redirect URIs: the URLs users are sent back to after logout, i.e. the
+   locally). The recipes-infrastructure dev stack registers `http://localhost:8080` plus its
+   `localExtraPorts` (8081-8089) and the dev server ports (5173, `localExtraDevServerPorts`
+   5174-5182) for Zitadel the same way as for Auth0, once `enableZitadel` is uncommented in its
+   `Pulumi.dev.yaml` (Zitadel is currently not enabled on the dev stack). Post-logout redirect URIs: the URLs users are sent back to after logout, i.e. the
    admin URL and the frontend URL. Zitadel only accepts registered post-logout URIs (exact match),
    so every `next` URL used for logout (admin and frontend) must be registered; otherwise Zitadel
    shows an error page after the local logout.
@@ -556,6 +563,13 @@ unless they hold the `admin` role.
    role to the organisations it was granted in, and only roles granted in that organisation are
    accepted, so admins of other organisations the project is granted to cannot assign `admin` to
    their own users.
+
+   The org scope also makes Zitadel apply that organisation's login policy and branding at the
+   sign-in page instead of the instance defaults: configure no self-registration, `forceMfa`
+   and the branding on the stack's organisation. Only users of that organisation can sign in;
+   the backend additionally refuses (`org_mismatch`) any login whose resource owner claim is
+   missing or names another organisation. A user of the organisation without role grants can
+   sign in but has no access.
 
 `ROLE_GROUP_MAP` (`editor` → Editors, `moderator` → Moderators) is shared by all providers, so
 Zitadel and Auth0 roles with the same name map to the same groups.
