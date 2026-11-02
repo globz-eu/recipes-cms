@@ -289,3 +289,18 @@ class EnforceZitadelOrgTestCase(SimpleTestCase):
         self.assertIsNone(
             self.enforce(id_token={OWNER_CLAIM: "org-2"}, name="auth0_openidconnect")
         )
+
+    def test_empty_claim_is_refused(self):
+        with self.assertRaises(OrgMismatch):
+            self.enforce(id_token={OWNER_CLAIM: ""})
+
+    def test_error_carries_the_org_mismatch_code(self):
+        with self.assertRaises(OrgMismatch) as caught:
+            self.enforce()
+
+        self.assertEqual(caught.exception.code, "org_mismatch")
+
+    @override_settings(ZITADEL_ROLE_ORG_ID="")
+    def test_blank_configured_org_never_admits_a_missing_claim(self):
+        with self.assertRaises(OrgMismatch):
+            self.enforce()

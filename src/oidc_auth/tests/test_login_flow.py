@@ -3,11 +3,14 @@
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+from django.utils.html import escape
 from social_django.models import UserSocialAuth
 
 from oidc_auth.backends import ZitadelOpenIdConnect
+from oidc_auth.exceptions import OrgMismatch
 
 User = get_user_model()
 
@@ -30,7 +33,7 @@ OWNER_CLAIM = "urn:zitadel:iam:user:resourceowner:id"
 class LoginFlowTestCase(TestCase):
     url = "/complete/zitadel/"
 
-    def complete(self, claims):
+    def complete(self, claims, next_url=NEXT):
         """Complete a Zitadel login of a user of org-1; a ``None`` claim is left out."""
         claims = {
             key: value
@@ -38,7 +41,8 @@ class LoginFlowTestCase(TestCase):
             if value is not None
         }
         session = self.client.session
-        session["next"] = NEXT
+        if next_url:
+            session["next"] = next_url
         session.save()
 
         def auth_complete(backend, *args, **kwargs):
@@ -201,3 +205,55 @@ class LoginFlowTestCase(TestCase):
             fetch_redirect_response=False,
         )
         self.assertEqual(UserSocialAuth.objects.count(), 1)
+
+    def test_org_mismatch_without_next_shows_message_on_admin_login(self):
+        response = self.complete(
+            {
+                "sub": "uid-1",
+                "email": EMAIL,
+                "email_verified": True,
+                OWNER_CLAIM: "org-2",
+            },
+            next_url=None,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith("/admin/login/"))
+        self.assertNotIn("auth_error", response["Location"])
+        page = self.client.get(response["Location"])
+        self.assertContains(page, escape(OrgMismatch.message))
+        self.assertFalse(User.objects.exists())
+
+    def test_existing_linked_user_now_owned_by_another_org_is_refused(self):
+        user = User.objects.create_user("known", email=EMAIL)
+        UserSocialAuth.objects.create(user=user, provider="zitadel", uid="uid-1")
+
+        response = self.complete(
+            {
+                "sub": "uid-1",
+                "email": EMAIL,
+                "email_verified": True,
+                OWNER_CLAIM: "org-2",
+            }
+        )
+
+        self.assertRedirects(
+            response,
+            f"{NEXT}?auth_error=org_mismatch",
+            fetch_redirect_response=False,
+        )
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_org_check_runs_right_after_auth_allowed_before_social_user(self):
+        pipeline = list(settings.SOCIAL_AUTH_PIPELINE)
+        step = "oidc_auth.pipeline.enforce_zitadel_org"
+
+        self.assertEqual(pipeline.count(step), 1)
+        self.assertEqual(
+            pipeline.index(step),
+            pipeline.index("social_core.pipeline.social_auth.auth_allowed") + 1,
+        )
+        self.assertLess(
+            pipeline.index(step),
+            pipeline.index("social_core.pipeline.social_auth.social_user"),
+        )
