@@ -228,7 +228,7 @@ statement that the Zitadel dev redirect URI is "registered for port 8080 only".
 
 ## Decisions (approved 2026-11-02)
 
-1. Missing `urn:zitadel:iam:user:resourceowner:id` claim: the login proceeds and a warning is logged (the org scope is the primary control).
+1. ~~Missing claim: proceed with a warning.~~ Revised 2026-11-02 after a security review flagged it as fail-open: the backend also requests the reserved scope `urn:zitadel:iam:user:resourceowner`, so Zitadel sends `urn:zitadel:iam:user:resourceowner:id`, and `enforce_zitadel_org` refuses a Zitadel login without that claim with `OrgMismatch` (`org_mismatch`), fail closed. The real-Zitadel check in recipes-infrastructure #6 must confirm the claim arrives.
 2. Do not request `urn:zitadel:iam:org:roles:id:<id>`; `read_zitadel_roles` already filters by org.
 3. New `auth_error` code `org_mismatch` (subclass of `LoginRefused`).
 4. Release as a minor bump (v0.12.0) after merge.
