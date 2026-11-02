@@ -13,6 +13,7 @@ User = get_user_model()
 
 EMAIL = "person@example.com"
 NEXT = "/frontend/"
+OWNER_CLAIM = "urn:zitadel:iam:user:resourceowner:id"
 
 
 @override_settings(
@@ -30,6 +31,12 @@ class LoginFlowTestCase(TestCase):
     url = "/complete/zitadel/"
 
     def complete(self, claims):
+        """Complete a Zitadel login of a user of org-1; a ``None`` claim is left out."""
+        claims = {
+            key: value
+            for key, value in {OWNER_CLAIM: "org-1", **claims}.items()
+            if value is not None
+        }
         session = self.client.session
         session["next"] = NEXT
         session.save()
@@ -45,7 +52,7 @@ class LoginFlowTestCase(TestCase):
         ):
             return self.client.get(self.url)
 
-    def test_login_requests_the_org_scope(self):
+    def test_login_requests_the_org_and_resource_owner_scopes(self):
         config = {"authorization_endpoint": "https://zitadel.example.com/authorize"}
         with patch.object(ZitadelOpenIdConnect, "oidc_config", lambda self: config):
             response = self.client.get("/login/zitadel/")
@@ -58,6 +65,7 @@ class LoginFlowTestCase(TestCase):
         )
         scope = parse_qs(location.query)["scope"][0].split(" ")
         self.assertIn("urn:zitadel:iam:org:id:org-1", scope)
+        self.assertIn("urn:zitadel:iam:user:resourceowner", scope)
 
     def test_email_owned_by_another_user_is_refused_before_creating_anything(self):
         User.objects.create_user("local", email=EMAIL, password="x")
@@ -81,7 +89,26 @@ class LoginFlowTestCase(TestCase):
                 "sub": "uid-1",
                 "email": EMAIL,
                 "email_verified": True,
-                "urn:zitadel:iam:user:resourceowner:id": "org-2",
+                OWNER_CLAIM: "org-2",
+            }
+        )
+
+        self.assertRedirects(
+            response,
+            f"{NEXT}?auth_error=org_mismatch",
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(User.objects.exists())
+        self.assertFalse(UserSocialAuth.objects.exists())
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_user_without_resource_owner_is_refused_before_creating_anything(self):
+        response = self.complete(
+            {
+                "sub": "uid-1",
+                "email": EMAIL,
+                "email_verified": True,
+                OWNER_CLAIM: None,
             }
         )
 
@@ -100,7 +127,7 @@ class LoginFlowTestCase(TestCase):
                 "sub": "uid-1",
                 "email": EMAIL,
                 "email_verified": True,
-                "urn:zitadel:iam:user:resourceowner:id": "org-1",
+                OWNER_CLAIM: "org-1",
             }
         )
 

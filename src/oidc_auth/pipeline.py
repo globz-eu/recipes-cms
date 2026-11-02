@@ -44,24 +44,19 @@ def enforce_zitadel_org(
     backend: Any, response: dict[str, Any], *args: Any, **kwargs: Any
 ) -> None:
     """
-    Refuse a Zitadel login whose user is owned by another org (``OrgMismatch``).
+    Refuse a Zitadel login unless its user is owned by ZITADEL_ROLE_ORG_ID.
 
     Defence in depth behind the org scope requested by ``ZitadelOpenIdConnect``,
-    which already makes Zitadel admit only users of ZITADEL_ROLE_ORG_ID. Runs
-    before ``social_user``, so nothing is looked up or created for a foreign
-    user. A missing resource owner claim is logged and the login proceeds.
-    Other providers are not checked.
+    which already makes Zitadel admit only users of ZITADEL_ROLE_ORG_ID. Fails
+    closed: a resource owner claim that is missing (``ZitadelOpenIdConnect``
+    requests the scope that asserts it) or names another org is refused with
+    ``OrgMismatch``. Runs before ``social_user``, so nothing is looked up or
+    created for a refused user. Other providers are not checked.
     """
     if backend.name != ZitadelOpenIdConnect.name:
         return None
     owner = read_claim(backend, response, ZITADEL_RESOURCE_OWNER_CLAIM)
-    if owner is None:
-        logger.warning(
-            "Zitadel login without %s claim; org not checked",
-            ZITADEL_RESOURCE_OWNER_CLAIM,
-        )
-        return None
-    if owner != settings.ZITADEL_ROLE_ORG_ID:
+    if owner is None or owner != settings.ZITADEL_ROLE_ORG_ID:
         raise OrgMismatch(backend)
     return None
 

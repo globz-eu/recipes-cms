@@ -281,11 +281,9 @@ class EnforceZitadelOrgTestCase(SimpleTestCase):
             )
         )
 
-    def test_missing_claim_passes_with_a_warning(self):
-        with self.assertLogs("oidc_auth.pipeline", "WARNING") as logs:
-            self.assertIsNone(self.enforce())
-
-        self.assertIn(OWNER_CLAIM, logs.output[0])
+    def test_missing_claim_is_refused(self):
+        with self.assertRaises(OrgMismatch):
+            self.enforce()
 
     def test_auth0_logins_are_not_checked(self):
         self.assertIsNone(
