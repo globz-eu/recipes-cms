@@ -475,10 +475,10 @@ Releases are built by CI on `v*.*.*` tags (`invoke bump`); see the infrastructur
 A social login is refused when the provider sends no email (`email_missing`), when the
 email is unverified (`email_unverified`), when it is already owned by another account or
 sign-in method (`email_in_use`), or when a user who is already signed in starts a social
-login (`already_signed_in`; they must sign out first). A Zitadel login is refused with
+login (`already_signed_in`; they must sign out first). The same code is used when the
+provider identity is already linked to a different user. A Zitadel login is refused with
 `org_mismatch` when the user's organisation (the `urn:zitadel:iam:user:resourceowner:id`
-claim) is missing or is not `ZITADEL_ROLE_ORG_ID`. The same code is used when the
-provider identity is already linked to a different user. Any other failed provider login
+claim) is missing or is not `ZITADEL_ROLE_ORG_ID`. Any other failed provider login
 (cancelled or forbidden, for example the user denies consent, a lost login state or a
 token error) gives the generic `login_failed`. For an existing association the email the
 provider reports at each login is checked; the stored email is never refreshed from the
