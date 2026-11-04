@@ -34,6 +34,8 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = PROJECT_DIR.parent
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
+# Previous keys, so sessions and signed values survive a key rotation.
+SECRET_KEY_FALLBACKS = env_list("SECRET_KEY_FALLBACKS")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
