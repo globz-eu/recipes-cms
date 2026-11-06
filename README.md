@@ -164,6 +164,9 @@ Create a `.env` file in the project root with the following variables:
 
 ```bash
 SECRET_KEY=your-django-secret-key
+# Optional: comma-separated previous keys, still accepted when verifying sessions and
+# signed values, so SECRET_KEY can be rotated without logging everyone out.
+# SECRET_KEY_FALLBACKS=old-key-1,old-key-2
 
 # Sign-in methods: comma-separated subset of local, auth0, zitadel (default local,auth0).
 # Each enabled provider's variables are required at startup; see "Authentication".

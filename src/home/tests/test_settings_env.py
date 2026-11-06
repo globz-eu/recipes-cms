@@ -1,8 +1,10 @@
+import importlib
 import os
 from unittest import mock
 
 from django.test import SimpleTestCase
 
+from recipe_cms.settings import base
 from recipe_cms.settings.base import env_list
 
 
@@ -35,3 +37,21 @@ class EnvListTests(SimpleTestCase):
         result = self.read(default=default)
         self.assertEqual(result, default)
         self.assertIsNot(result, default)
+
+
+class SecretKeyFallbacksTests(SimpleTestCase):
+    def load(self, value=None):
+        env = {k: v for k, v in os.environ.items() if k != "SECRET_KEY_FALLBACKS"}
+        if value is not None:
+            env["SECRET_KEY_FALLBACKS"] = value
+        with mock.patch.dict(os.environ, env, clear=True):
+            return importlib.reload(base).SECRET_KEY_FALLBACKS
+
+    def tearDown(self):
+        importlib.reload(base)
+
+    def test_unset_is_empty(self):
+        self.assertEqual(self.load(), [])
+
+    def test_reads_comma_separated_keys(self):
+        self.assertEqual(self.load(" old1 ,old2,, "), ["old1", "old2"])
