@@ -129,14 +129,7 @@ def get_db_image(requested_image: str, image_type: str) -> bool:
 
     match image_type:
         case "rendition":
-            try:
-                rendition = RenditionModel.objects.get(file=requested_image)
-                # Load the related image (one query), as before; only the lookup
-                # matters, the loaded image itself is not used.
-                _ = rendition.image
-                return True
-            except RenditionModel.DoesNotExist:
-                return False
+            return RenditionModel.objects.filter(file=requested_image).exists()
 
         case "original":
             try:
