@@ -135,15 +135,8 @@ def _import_group(group: dict, homepages: dict, result: ImportResult, user) -> N
             result.updated.append(_summary(page))
 
 
-def import_recipes(groups: list[dict], user=None) -> ImportResult:
-    """
-    Creates or updates recipes from validated BulkUploadSerializer data.
-
-    Recipes are matched by (slug, locale). Translations within a group are
-    linked through a shared translation_key. The import is all-or-nothing:
-    on any error the transaction is rolled back and RecipeImportError carries
-    the errors keyed by group index.
-    """
+def _load_homepages(groups: list[dict]) -> dict[str, HomePage]:
+    """Returns the single depth-2 HomePage per locale used by the groups."""
     language_codes = {code for group in groups for code in group["translations"]}
     homepages: dict[str, HomePage] = {}
     for homepage in (
@@ -170,6 +163,19 @@ def import_recipes(groups: list[dict], user=None) -> ImportResult:
                 ]
             }
         )
+    return homepages
+
+
+def import_recipes(groups: list[dict], user=None) -> ImportResult:
+    """
+    Creates or updates recipes from validated BulkUploadSerializer data.
+
+    Recipes are matched by (slug, locale). Translations within a group are
+    linked through a shared translation_key. The import is all-or-nothing:
+    on any error the transaction is rolled back and RecipeImportError carries
+    the errors keyed by group index.
+    """
+    homepages = _load_homepages(groups)
 
     result = ImportResult()
     errors = {}
