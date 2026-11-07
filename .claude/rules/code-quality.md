@@ -3,7 +3,9 @@
 These rules apply to every change. Ruff and mypy enforce the measurable ones (`uv run invoke
 lint`). Don't silence a finding to get past it. Restructure the code instead. `noqa` and
 `type: ignore` are only acceptable for code you don't control (a Django/DRF override, an untyped
-library), and need a code and a reason: `# noqa: PLR0913 -- parameters are invoke CLI flags`.
+library), and need a code and a reason: `# noqa: PLR0913 -- parameters are invoke CLI flags`,
+`# type: ignore[attr-defined]  # reverse accessor added by social_django`. mypy's
+`warn_unused_ignores` flags an ignore that is no longer needed, so remove it then.
 Django/Wagtail-specific rules are in `backend.md`.
 
 ## Simplicity / YAGNI
@@ -82,7 +84,8 @@ Ruff (`C4`, `SIM`, `UP`, `RET`, `PERF`, `B`, `PIE`, `PTH`, `FURB`) enforces many
 
 ## Types
 
-- Production code is fully annotated (ruff `ANN`). Tests and migrations are exempt.
+- Production code is fully annotated (ruff `ANN`). Tests and migrations are exempt from `ANN`,
+  and migrations are also exempt from the Pythonic and complexity rules.
 - mypy with `django-stubs` and `djangorestframework-stubs` checks all of `src/` and `tasks.py`.
   Untyped libraries (Wagtail, social-auth, modelcluster, storages, invoke) are handled per module
   with `ignore_missing_imports` in `pyproject.toml`.
