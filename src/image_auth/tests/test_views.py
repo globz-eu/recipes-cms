@@ -8,8 +8,9 @@ from django.contrib.auth.models import Group
 from django.http import StreamingHttpResponse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from wagtail.images.models import Image
 
-from image_auth.views import get_image_file, get_image_type
+from image_auth.views import get_db_image, get_image_file, get_image_type
 
 User = get_user_model()
 
@@ -259,3 +260,35 @@ class ServeMediaViewTests(APITestCase):
         self.client.login(username="editor", password="testpass123")
         response = self.client.get(self.MISSING_URL)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class GetDbImageTests(APITestCase):
+    """Exercise get_db_image against real rows; only file names are stored."""
+
+    def _image(self, name: str = "original_images/test.jpg") -> Image:
+        return Image.objects.create(title="test", file=name, width=10, height=10)
+
+    def _rendition(self, image: Image, file: str, filter_spec: str):
+        return Image.get_rendition_model().objects.create(
+            image=image, file=file, filter_spec=filter_spec, width=10, height=10
+        )
+
+    def test_rendition_exists(self):
+        self._rendition(self._image(), "images/test.jpg", "fill-10x10")
+        self.assertTrue(get_db_image("images/test.jpg", "rendition"))
+
+    def test_duplicate_renditions_do_not_raise(self):
+        image = self._image()
+        self._rendition(image, "images/dup.jpg", "fill-10x10")
+        self._rendition(image, "images/dup.jpg", "fill-20x20")
+        self.assertTrue(get_db_image("images/dup.jpg", "rendition"))
+
+    def test_missing_rendition(self):
+        self.assertFalse(get_db_image("images/missing.jpg", "rendition"))
+
+    def test_original_exists(self):
+        self._image("original_images/test.jpg")
+        self.assertTrue(get_db_image("original_images/test.jpg", "original"))
+
+    def test_missing_original(self):
+        self.assertFalse(get_db_image("original_images/missing.jpg", "original"))
