@@ -64,7 +64,7 @@ def authentication_backends(providers: list[str]) -> list[str]:
     return backends
 
 
-def _is_missing(value: Any) -> bool:
+def _is_missing(value: object) -> bool:
     """Unset, empty and whitespace-only values all count as missing."""
     if isinstance(value, str):
         return not value.strip()

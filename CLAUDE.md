@@ -19,7 +19,8 @@ uv run invoke dev [--build]         # docker compose up --watch (src/ is synced 
 uv run invoke down [--volumes]      # docker compose down [-v]
 uv run invoke worktree-env --port N  # write this worktree's .env (own project name, ports, cookies)
 uv run invoke test --label=recipes  # run tests in the container (label optional)
-uv run invoke format                # ruff check --fix + ruff format on src
+uv run invoke format                # ruff check --fix + ruff format on src and tasks.py
+uv run invoke lint                  # ruff check + ruff format --check + mypy (on the host, changes nothing)
 uv run invoke bump --part minor     # bump version, commit, tag vX.Y.Z (tag push triggers the CI image build)
 
 # Single test / module, directly
@@ -59,5 +60,7 @@ Staging runs on Scaleway, managed by the sibling `recipes-infrastructure` Pulumi
 
 ## Conventions
 
-- Ruff: line length 88, double quotes, import sorting enabled (`I`).
+- Code rules are in `.claude/rules/code-quality.md` (clean, typed, Pythonic code) and `.claude/rules/backend.md` (Django/Wagtail).
+- Ruff: line length 88, double quotes, import sorting, plus Pythonic rule sets, `C901` complexity and `ANN` annotations in production code; mypy with django-stubs checks `src/` and `tasks.py`. `uv run invoke lint` must pass.
+- Commits: capitalised imperative verb, short, no prefix; small, granular commits.
 - Tests live in `<app>/tests/` and use Django's test runner (not pytest).

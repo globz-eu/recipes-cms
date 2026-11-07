@@ -3,13 +3,15 @@ Social auth pipeline functions shared by all sign-in providers.
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured
+from social_core.backends.base import BaseAuth
 from social_core.exceptions import AuthAlreadyAssociated
 from social_core.pipeline.user import create_user as social_create_user
+from social_core.strategy import BaseStrategy
 
 from oidc_auth.backends import ZitadelOpenIdConnect
 from oidc_auth.exceptions import (
@@ -34,14 +36,14 @@ logger = logging.getLogger(__name__)
 ADMIN_ROLE = "admin"
 
 
-def _is_verified(value: Any) -> bool:
+def _is_verified(value: object) -> bool:
     if isinstance(value, str):
         return value.lower() == "true"
     return value is True
 
 
 def enforce_zitadel_org(
-    backend: Any, response: dict[str, Any], *args: Any, **kwargs: Any
+    backend: BaseAuth, response: dict[str, Any], *args: Any, **kwargs: Any
 ) -> None:
     """
     Refuse a Zitadel login unless its user is owned by ZITADEL_ROLE_ORG_ID.
@@ -54,18 +56,17 @@ def enforce_zitadel_org(
     created for a refused user. Other providers are not checked.
     """
     if backend.name != ZitadelOpenIdConnect.name:
-        return None
+        return
     owner = read_claim(backend, response, ZITADEL_RESOURCE_OWNER_CLAIM)
     if owner is None or owner != settings.ZITADEL_ROLE_ORG_ID:
         raise OrgMismatch(backend)
-    return None
 
 
 def enforce_email_ownership(
-    backend: Any,
+    backend: BaseAuth,
     details: dict[str, Any],
     response: dict[str, Any],
-    user: Optional["AbstractUser"] = None,
+    user: AbstractUser | None = None,
     *args: Any,
     **kwargs: Any,
 ) -> None:
@@ -96,14 +97,13 @@ def enforce_email_ownership(
         raise EmailNotVerified(backend)
     if email_owner(email, exclude=user) is not None:
         raise EmailOwnedElsewhere(backend)
-    return None
 
 
 def create_user(
-    strategy: Any,
+    strategy: BaseStrategy,
     details: dict[str, Any],
-    backend: Any,
-    user: Optional["AbstractUser"] = None,
+    backend: BaseAuth,
+    user: AbstractUser | None = None,
     *args: Any,
     **kwargs: Any,
 ) -> dict[str, Any] | None:
@@ -116,7 +116,14 @@ def create_user(
     social_django reports as ``AuthAlreadyAssociated``.
     """
     try:
-        return social_create_user(strategy, details, backend, user, *args, **kwargs)
+        return social_create_user(
+            strategy,
+            details,
+            backend,
+            user,  # type: ignore[arg-type]  # AbstractUser satisfies UserProtocol at runtime
+            *args,
+            **kwargs,
+        )
     except AuthAlreadyAssociated as error:
         if email_owner(details.get("email") or "") is not None:
             raise EmailOwnedElsewhere(backend) from error
@@ -124,8 +131,8 @@ def create_user(
 
 
 def sync_roles(
-    backend: Any,
-    user: Optional["AbstractUser"],
+    backend: BaseAuth,
+    user: AbstractUser | None,
     response: dict[str, Any],
     *args: Any,
     **kwargs: Any,
@@ -138,7 +145,7 @@ def sync_roles(
     no roles ends up in no mapped group.
     """
     if user is None:
-        return None
+        return
 
     provider = provider_for_backend(backend.name)
     if provider is None:
@@ -170,4 +177,3 @@ def sync_roles(
         sorted(roles),
         sorted(wanted),
     )
-    return None

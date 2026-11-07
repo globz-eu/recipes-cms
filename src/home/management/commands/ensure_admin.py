@@ -1,12 +1,13 @@
 import os
+from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand, CommandError, CommandParser
 from django.db import transaction
 
-from oidc_auth.ownership import email_owner
+from oidc_auth.ownership import email_owner, has_social_login
 
 
 class Command(BaseCommand):
@@ -16,7 +17,7 @@ class Command(BaseCommand):
         "appears in the process list or shell history."
     )
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--username",
             default=os.getenv("DJANGO_ADMIN_USERNAME"),
@@ -29,7 +30,7 @@ class Command(BaseCommand):
         )
 
     @transaction.atomic
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         username = options["username"]
         email = options["email"]
         password = os.getenv("DJANGO_ADMIN_PASSWORD")
@@ -40,14 +41,14 @@ class Command(BaseCommand):
 
         User = get_user_model()
         user, created = User.objects.get_or_create(**{User.USERNAME_FIELD: username})
-        if user.social_auth.exists():
+        if has_social_login(user):
             raise CommandError(
                 f"admin '{username}': this account signs in through a social "
                 "provider and cannot get a password."
             )
         if email is not None:
             owner = email_owner(email, exclude=user)
-            if owner is not None and owner.social_auth.exists():
+            if owner is not None and has_social_login(owner):
                 raise CommandError(
                     f"admin '{username}': {email} belongs to an account that "
                     "signs in through a social provider."
@@ -64,7 +65,7 @@ class Command(BaseCommand):
         try:
             validate_password(password, user)
         except ValidationError as error:
-            raise CommandError(" ".join(error.messages))
+            raise CommandError(" ".join(error.messages)) from error
         user.set_password(password)
         user.save()
 

@@ -1,7 +1,7 @@
 import os
 from urllib.parse import urlsplit
 
-from .base import *  # noqa: F403
+from .base import *  # noqa: F403 -- settings extend base via star import
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -22,7 +22,7 @@ DEV_PASSWORD_LOGIN = True
 # browser's Origin (http://localhost:<vite port>) while nginx forwards the nginx
 # host, so Django sees a cross-origin request: trust each dev server origin.
 # One entry per dev server, comma-separated (`invoke worktree-env` sets it).
-CSRF_TRUSTED_ORIGINS = env_list(  # noqa: F405
+CSRF_TRUSTED_ORIGINS = env_list(  # noqa: F405 -- settings extend base via star import
     "DEV_FRONTEND_ORIGINS", default=["http://localhost:5173"]
 )
 

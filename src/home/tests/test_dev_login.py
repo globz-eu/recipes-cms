@@ -45,6 +45,17 @@ class DevLoginViewTests(TestCase):
         self.assertEqual(response.status_code, 400)
 
     @override_settings(DEV_PASSWORD_LOGIN=True)
+    def test_non_object_body_is_rejected(self):
+        for body in ("[]", '"editor"', "null"):
+            with self.subTest(body=body):
+                response = self.client.post(
+                    self.url, body, content_type="application/json"
+                )
+
+                self.assertEqual(response.status_code, 400)
+                self.assertNotIn("_auth_user_id", self.client.session)
+
+    @override_settings(DEV_PASSWORD_LOGIN=True)
     def test_inactive_user_is_rejected(self):
         self.user.is_active = False
         self.user.save()

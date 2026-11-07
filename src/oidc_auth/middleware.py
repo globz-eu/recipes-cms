@@ -54,7 +54,7 @@ class LoginRefusedMiddleware:
     user-facing message and redirects to the Wagtail admin login page.
     """
 
-    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]):
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:

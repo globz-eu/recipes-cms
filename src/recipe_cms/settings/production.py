@@ -2,7 +2,7 @@ import os
 
 from corsheaders.defaults import default_headers, default_methods
 
-from .base import *  # noqa: F403
+from .base import *  # noqa: F403 -- settings extend base via star import
 from .base import env_list
 
 DEBUG = False
@@ -32,10 +32,10 @@ SOCIAL_AUTH_REDIRECT_IS_HTTPS = True
 # (e.g. after a Wagtail upgrade).
 # See https://docs.djangoproject.com/en/6.0/ref/contrib/staticfiles/#manifeststaticfilesstorage
 # Build a new dict: STORAGES is shared with the base module, which must not change.
-STORAGES = {  # noqa: F405
-    **STORAGES,  # noqa: F405
+STORAGES = {  # noqa: F405 -- settings extend base via star import
+    **STORAGES,  # noqa: F405 -- settings extend base via star import
     "staticfiles": {
-        **STORAGES["staticfiles"],  # noqa: F405
+        **STORAGES["staticfiles"],  # noqa: F405 -- settings extend base via star import
         "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
     },
 }

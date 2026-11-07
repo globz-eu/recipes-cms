@@ -1,6 +1,12 @@
+from typing import TYPE_CHECKING
+
 from django.conf import settings
 from rest_framework import permissions
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.request import Request
+
+if TYPE_CHECKING:
+    from rest_framework.views import APIView
 
 
 class IsEditorOrAdmin(permissions.BasePermission):
@@ -13,7 +19,7 @@ class IsEditorOrAdmin(permissions.BasePermission):
     clients can tell them apart from anonymous users.
     """
 
-    def has_permission(self, request, view) -> bool:  # type: ignore[override]
+    def has_permission(self, request: Request, view: APIView) -> bool:
         # User must be authenticated
         if (
             not hasattr(request, "user")

@@ -326,6 +326,7 @@ Common development tasks are automated with [Invoke](https://www.pyinvoke.org/).
 | `invoke down` | Stop and remove this directory's stack (`--volumes` also removes volumes) |
 | `invoke worktree-env` | Write a worktree's `.env` with its own project name, ports, cookie names and dev server origins (`--port` required) |
 | `invoke format` | Format and auto-fix source code using `ruff` |
+| `invoke lint` | Check code without changing it: `ruff check`, `ruff format --check` and `mypy` (runs on the host) |
 | `invoke bump` | Bump the project version, update the lockfile, and create an annotated git tag (`--part major\|minor\|patch`, default: `patch`) |
 
 ```bash

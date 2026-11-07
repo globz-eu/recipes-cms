@@ -1,7 +1,9 @@
 import functools
 import re
+from collections.abc import Iterator
 
 import boto3
+from botocore.client import BaseClient
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from django.conf import settings
@@ -10,6 +12,7 @@ from rest_framework import permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
+from rest_framework.views import APIView
 from wagtail.images.models import Image
 
 from home.permissions import IsEditorOrAdmin
@@ -29,7 +32,7 @@ class MediaAccessPermission(permissions.BasePermission):
       required role/group membership.
     """
 
-    def has_permission(self, request: Request, view) -> bool:  # type: ignore[override]
+    def has_permission(self, request: Request, view: APIView) -> bool:
         image_path = view.kwargs.get("image_path", "")
         image_type = get_image_type(image_path)
         if not image_type:
@@ -42,7 +45,7 @@ class MediaAccessPermission(permissions.BasePermission):
 
 
 @functools.lru_cache(maxsize=1)
-def _get_s3_client():
+def _get_s3_client() -> BaseClient:
     return boto3.client(
         "s3",
         aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
@@ -78,12 +81,13 @@ def serve_media(request: Request, image_path: str) -> StreamingHttpResponse:
         )
     except ClientError as exc:
         if exc.response["Error"]["Code"] in ("NoSuchKey", "404"):
-            raise Http404
+            # The S3 error is an implementation detail; the client only sees 404.
+            raise Http404 from None
         raise
 
     content_type = obj.get("ContentType", "application/octet-stream")
 
-    def _iter_body():
+    def _iter_body() -> Iterator[bytes]:
         body = obj["Body"]
         while chunk := body.read(_S3_CHUNK_SIZE):
             yield chunk
@@ -112,10 +116,9 @@ def get_image_type(image: str) -> str | None:
     """
     if re.match(r"^images/", image):
         return "rendition"
-    elif re.match(r"^original_images/", image):
+    if re.match(r"^original_images/", image):
         return "original"
-    else:
-        return None
+    return None
 
 
 def get_db_image(requested_image: str, image_type: str) -> bool:
@@ -126,17 +129,9 @@ def get_db_image(requested_image: str, image_type: str) -> bool:
 
     match image_type:
         case "rendition":
-            try:
-                RenditionModel.objects.get(file=requested_image).image
-                return True
-            except RenditionModel.DoesNotExist:
-                return False
+            return RenditionModel.objects.filter(file=requested_image).exists()
 
         case "original":
-            try:
-                Image.objects.get(file=requested_image)
-                return True
-            except Image.DoesNotExist:
-                return False
+            return Image.objects.filter(file=requested_image).exists()
 
     return False

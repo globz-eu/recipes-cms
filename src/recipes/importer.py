@@ -1,12 +1,17 @@
 import uuid
 from dataclasses import dataclass, field
 
+from django.contrib.auth.base_user import AbstractBaseUser
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 
 from home.models import HomePage
 
 from .models import RecipeIngredient, RecipePage
+
+# The API passes request.user (possibly anonymous); the command passes none.
+ImportUser = AbstractBaseUser | AnonymousUser | None
 
 PAGE_FIELDS = [
     "title",
@@ -20,7 +25,7 @@ PAGE_FIELDS = [
 class RecipeImportError(Exception):
     """Raised when an upload cannot be imported; nothing has been written."""
 
-    def __init__(self, errors: dict):
+    def __init__(self, errors: dict) -> None:
         super().__init__(errors)
         self.errors = errors
 
@@ -48,7 +53,7 @@ def _apply_fields(page: RecipePage, data: dict) -> None:
     page.ingredients = [RecipeIngredient(**item) for item in data["ingredients"]]
 
 
-def _save(page: RecipePage, live: bool, user) -> None:
+def _save(page: RecipePage, live: bool, user: ImportUser) -> None:
     """
     Saves a revision and publishes or unpublishes it as requested, as far as
     the user's Wagtail page permissions allow. Users who may not publish (e.g.
@@ -66,7 +71,9 @@ def _save(page: RecipePage, live: bool, user) -> None:
         page.unpublish(user=user)
 
 
-def _import_group(group: dict, homepages: dict, result: ImportResult, user) -> None:
+def _import_group(
+    group: dict, homepages: dict, result: ImportResult, user: ImportUser
+) -> None:
     translations = group["translations"]
     existing = {
         code: RecipePage.objects.child_of(homepages[code])
@@ -135,15 +142,8 @@ def _import_group(group: dict, homepages: dict, result: ImportResult, user) -> N
             result.updated.append(_summary(page))
 
 
-def import_recipes(groups: list[dict], user=None) -> ImportResult:
-    """
-    Creates or updates recipes from validated BulkUploadSerializer data.
-
-    Recipes are matched by (slug, locale). Translations within a group are
-    linked through a shared translation_key. The import is all-or-nothing:
-    on any error the transaction is rolled back and RecipeImportError carries
-    the errors keyed by group index.
-    """
+def _load_homepages(groups: list[dict]) -> dict[str, HomePage]:
+    """Returns the single depth-2 HomePage per locale used by the groups."""
     language_codes = {code for group in groups for code in group["translations"]}
     homepages: dict[str, HomePage] = {}
     for homepage in (
@@ -170,6 +170,19 @@ def import_recipes(groups: list[dict], user=None) -> ImportResult:
                 ]
             }
         )
+    return homepages
+
+
+def import_recipes(groups: list[dict], user: ImportUser = None) -> ImportResult:
+    """
+    Creates or updates recipes from validated BulkUploadSerializer data.
+
+    Recipes are matched by (slug, locale). Translations within a group are
+    linked through a shared translation_key. The import is all-or-nothing:
+    on any error the transaction is rolled back and RecipeImportError carries
+    the errors keyed by group index.
+    """
+    homepages = _load_homepages(groups)
 
     result = ImportResult()
     errors = {}

@@ -8,6 +8,7 @@ from urllib.parse import urlencode, urlunsplit
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpRequest
+from social_core.backends.base import BaseAuth
 from social_django.models import UserSocialAuth
 
 from oidc_auth.config import AUTH0, LOCAL, ZITADEL
@@ -16,7 +17,7 @@ ZITADEL_ROLES_CLAIM = "urn:zitadel:iam:org:project:roles"
 ZITADEL_RESOURCE_OWNER_CLAIM = "urn:zitadel:iam:user:resourceowner:id"
 
 
-def read_claim(backend: Any, response: dict[str, Any], claim: str) -> Any:
+def read_claim(backend: BaseAuth, response: dict[str, Any], claim: str) -> object:
     """Read a claim, preferring the validated ID token over the userinfo response."""
     id_token = getattr(backend, "id_token", None)
     if isinstance(id_token, dict) and claim in id_token:
@@ -24,7 +25,7 @@ def read_claim(backend: Any, response: dict[str, Any], claim: str) -> Any:
     return response.get(claim)
 
 
-def read_auth0_roles(backend: Any, response: dict[str, Any]) -> set[str]:
+def read_auth0_roles(backend: BaseAuth, response: dict[str, Any]) -> set[str]:
     """Auth0 roles: a list under AUTH0_ROLES_CLAIM. Malformed means no roles."""
     claim = settings.AUTH0_ROLES_CLAIM
     if not claim:
@@ -37,7 +38,7 @@ def read_auth0_roles(backend: Any, response: dict[str, Any]) -> set[str]:
     return {role for role in raw if isinstance(role, str)}
 
 
-def read_zitadel_roles(backend: Any, response: dict[str, Any]) -> set[str]:
+def read_zitadel_roles(backend: BaseAuth, response: dict[str, Any]) -> set[str]:
     """Zitadel roles: the keys of an object claim. Anything else means no roles.
 
     Each value maps the organisation ids the role was granted in to their
@@ -103,7 +104,7 @@ class Provider:
     id: str
     backend_name: str
     label: str
-    read_roles: Callable[[Any, dict[str, Any]], set[str]]
+    read_roles: Callable[[BaseAuth, dict[str, Any]], set[str]]
     logout_url: Callable[[HttpRequest, UserSocialAuth, str], str]
 
 

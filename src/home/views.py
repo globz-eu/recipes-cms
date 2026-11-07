@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib.auth import authenticate, login
+from django.db.models import QuerySet
 from django.http import Http404
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
@@ -24,7 +25,7 @@ class HomeViewSet(ReadOnlyModelViewSet):
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsEditorOrAdmin]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[HomePage]:
         queryset = super().get_queryset()
         if self.action == "list":
             queryset = queryset.filter(locale=get_requested_locale(self.request))
@@ -59,8 +60,11 @@ class DevLoginView(APIView):
     def post(self, request: Request) -> Response:
         if not settings.DEV_PASSWORD_LOGIN:
             raise Http404
-        username = request.data.get("username")
-        password = request.data.get("password")
+        data = request.data
+        if not isinstance(data, dict):
+            data = {}
+        username = data.get("username")
+        password = data.get("password")
         user = (
             authenticate(request, username=username, password=password)
             if isinstance(username, str) and isinstance(password, str)
