@@ -24,15 +24,58 @@ dev = [
 exclude = [".venv", ".git", ".vscode", "__pycache__"]
 line-length = 88
 indent-width = 4
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]
-extend-select = ["I"]
+extend-select = [
+    "I",
+    "C4",
+    "SIM",
+    "UP",
+    "RET",
+    "PERF",
+    "B",
+    "PIE",
+    "PTH",
+    "FURB",
+    "C901",
+    "PLR0912",
+    "PLR0913",
+    "ANN",
+]
 ignore = []
 fixable = ["ALL"]
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-args = 5
+max-branches = 12
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = true
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["ANN"]
+"**/migrations/**" = [
+    "ANN",
+    "C4",
+    "SIM",
+    "UP",
+    "RET",
+    "PERF",
+    "B",
+    "PIE",
+    "PTH",
+    "FURB",
+    "C901",
+    "PLR0912",
+    "PLR0913",
+]
 
 [tool.ruff.format]
 quote-style = "double"
