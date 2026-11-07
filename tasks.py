@@ -36,8 +36,22 @@ def bump(c, part="patch"):
 @task
 def format(c):
     """Format code using ruff."""
-    c.run("uv run ruff check --fix src")
-    c.run("uv run ruff format src")
+    c.run("uv run ruff check --fix src tasks.py")
+    c.run("uv run ruff format src tasks.py")
+
+
+@task
+def lint(c):
+    """Check code with ruff (lint and format) and mypy; changes nothing."""
+    # settings import on the host only for the mypy django plugin.
+    env = {"AUTH_PROVIDERS": "local"}
+    results = [
+        c.run("uv run ruff check src tasks.py", warn=True, env=env),
+        c.run("uv run ruff format --check src tasks.py", warn=True, env=env),
+        c.run("uv run mypy", warn=True, env=env),
+    ]
+    if any(result.failed for result in results):
+        raise Exit("Lint failed.")
 
 
 @task(
