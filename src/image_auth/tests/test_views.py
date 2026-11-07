@@ -290,5 +290,10 @@ class GetDbImageTests(APITestCase):
         self._image("original_images/test.jpg")
         self.assertTrue(get_db_image("original_images/test.jpg", "original"))
 
+    def test_duplicate_originals_do_not_raise(self):
+        self._image("original_images/dup.jpg")
+        self._image("original_images/dup.jpg")
+        self.assertTrue(get_db_image("original_images/dup.jpg", "original"))
+
     def test_missing_original(self):
         self.assertFalse(get_db_image("original_images/missing.jpg", "original"))

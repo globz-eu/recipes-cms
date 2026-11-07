@@ -132,10 +132,6 @@ def get_db_image(requested_image: str, image_type: str) -> bool:
             return RenditionModel.objects.filter(file=requested_image).exists()
 
         case "original":
-            try:
-                Image.objects.get(file=requested_image)
-                return True
-            except Image.DoesNotExist:
-                return False
+            return Image.objects.filter(file=requested_image).exists()
 
     return False
