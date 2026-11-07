@@ -36,8 +36,7 @@ class CustomLogoutView(View):
 
     def get_social_link(self, request: HttpRequest) -> UserSocialAuth | None:
         """The social link of the session's sign-in, else the newest link."""
-        # Callers check is_authenticated; social_auth is added by social_django.
-        links = request.user.social_auth.order_by(  # type: ignore[union-attr]
+        links = request.user.social_auth.order_by(  # type: ignore[union-attr]  # social_auth is added by social_django; callers check is_authenticated
             "-pk"
         )
         path = request.session.get(BACKEND_SESSION_KEY)

@@ -9,7 +9,7 @@ from invoke.tasks import task
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from home.worktree_env import (  # noqa: E402
+from home.worktree_env import (  # noqa: E402 -- src/ must be on sys.path first
     check_ports,
     default_dev_server_port,
     default_postgres_port,
