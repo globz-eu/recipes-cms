@@ -1,6 +1,6 @@
 """Lookups enforcing that one email address belongs to one sign-in method."""
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.db.models import Value
@@ -11,8 +11,8 @@ if TYPE_CHECKING:
 
 
 def email_owner(
-    email: str, *, exclude: Optional["AbstractUser"] = None
-) -> Optional["AbstractUser"]:
+    email: str, *, exclude: AbstractUser | None = None
+) -> AbstractUser | None:
     """The first user of any kind with this email (case-insensitive), if any."""
     if not email:
         return None

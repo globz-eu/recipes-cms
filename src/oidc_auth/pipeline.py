@@ -3,7 +3,7 @@ Social auth pipeline functions shared by all sign-in providers.
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.contrib.auth.models import Group
@@ -54,18 +54,18 @@ def enforce_zitadel_org(
     created for a refused user. Other providers are not checked.
     """
     if backend.name != ZitadelOpenIdConnect.name:
-        return None
+        return
     owner = read_claim(backend, response, ZITADEL_RESOURCE_OWNER_CLAIM)
     if owner is None or owner != settings.ZITADEL_ROLE_ORG_ID:
         raise OrgMismatch(backend)
-    return None
+    return
 
 
 def enforce_email_ownership(
     backend: Any,
     details: dict[str, Any],
     response: dict[str, Any],
-    user: Optional["AbstractUser"] = None,
+    user: AbstractUser | None = None,
     *args: Any,
     **kwargs: Any,
 ) -> None:
@@ -96,14 +96,14 @@ def enforce_email_ownership(
         raise EmailNotVerified(backend)
     if email_owner(email, exclude=user) is not None:
         raise EmailOwnedElsewhere(backend)
-    return None
+    return
 
 
 def create_user(
     strategy: Any,
     details: dict[str, Any],
     backend: Any,
-    user: Optional["AbstractUser"] = None,
+    user: AbstractUser | None = None,
     *args: Any,
     **kwargs: Any,
 ) -> dict[str, Any] | None:
@@ -125,7 +125,7 @@ def create_user(
 
 def sync_roles(
     backend: Any,
-    user: Optional["AbstractUser"],
+    user: AbstractUser | None,
     response: dict[str, Any],
     *args: Any,
     **kwargs: Any,
@@ -138,7 +138,7 @@ def sync_roles(
     no roles ends up in no mapped group.
     """
     if user is None:
-        return None
+        return
 
     provider = provider_for_backend(backend.name)
     if provider is None:
@@ -170,4 +170,4 @@ def sync_roles(
         sorted(roles),
         sorted(wanted),
     )
-    return None
+    return
