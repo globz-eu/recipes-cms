@@ -22,7 +22,8 @@ from home.worktree_env import (  # noqa: E402
 def _run(c: Context, command: str, **kwargs: Any) -> Result:
     """`c.run` that returns the Result; it is only None for `disown=True`."""
     result = c.run(command, **kwargs)
-    assert result is not None  # noqa: S101 -- narrows the type, never disowned
+    if result is None:
+        raise RuntimeError(f"invoke returned no result for: {command}")
     return result
 
 
@@ -53,7 +54,8 @@ def format(c: Context) -> None:
 @task
 def lint(c: Context) -> None:
     """Check code with ruff (lint and format) and mypy; changes nothing."""
-    # settings import on the host only for the mypy django plugin.
+    # The mypy django plugin imports the settings on the host; one provider avoids
+    # needing the social-login variables.
     env = {"AUTH_PROVIDERS": "local"}
     results = [
         _run(c, "uv run ruff check src tasks.py", warn=True, env=env),
