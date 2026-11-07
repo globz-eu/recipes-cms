@@ -268,7 +268,27 @@ class BulkUploadTests(APITestCase):
         self.assertIn("es", str(response.data))
 
     def test_invalid_json_file(self):
-        self.assertNothingWritten(self.upload_file(b"{not json"))
+        response = self.upload_file(b"{not json")
+
+        self.assertNothingWritten(response)
+        self.assertTrue(response.data["file"][0].startswith("Invalid JSON: "))
+
+    def test_file_that_is_not_utf8(self):
+        response = self.upload_file(b"\xff\xfe{}")
+
+        self.assertNothingWritten(response)
+        self.assertEqual(response.data["file"], ["File must be UTF-8 encoded."])
+
+    def test_locale_without_homepage_is_rejected(self):
+        HomePage.objects.filter(locale__language_code="nl").delete()
+
+        response = self.upload_json(pancakes(en=EN_PANCAKES, nl=DE_PANCAKES))
+
+        self.assertNothingWritten(response)
+        self.assertIn(
+            "No homepage exists for locale(s): nl.",
+            response.data["non_field_errors"],
+        )
 
     def test_missing_title(self):
         response = self.upload_json(
@@ -425,3 +445,28 @@ class ImportRecipesCommandTests(APITestCase):
         with self.assertRaises(CommandError):
             self.run_command(pancakes(xx=EN_PANCAKES))
         self.assertFalse(RecipePage.objects.exists())
+
+    def test_missing_file(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "missing.json"
+            with self.assertRaisesMessage(CommandError, f"Cannot read {path}") as ctx:
+                call_command("import_recipes", str(path))
+        self.assertIsInstance(ctx.exception.__cause__, OSError)
+
+    def test_invalid_json(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "recipes.json"
+            path.write_text("{not json", encoding="utf-8")
+            with self.assertRaisesMessage(
+                CommandError, f"Invalid JSON in {path}"
+            ) as ctx:
+                call_command("import_recipes", str(path))
+        self.assertIsInstance(ctx.exception.__cause__, json.JSONDecodeError)
+
+    def test_import_error_is_chained(self):
+        HomePage.objects.filter(locale__language_code="nl").delete()
+
+        with self.assertRaises(CommandError) as ctx:
+            self.run_command(pancakes(nl=DE_PANCAKES))
+
+        self.assertIsInstance(ctx.exception.__cause__, importer.RecipeImportError)
