@@ -66,7 +66,9 @@ class Command(BaseCommand):
             try:
                 validate_password(password, user)
             except ValidationError as error:
-                raise CommandError(f"{role.lower()}: " + " ".join(error.messages))
+                raise CommandError(
+                    f"{role.lower()}: " + " ".join(error.messages)
+                ) from error
             user.set_password(password)
             user.save()
             if group_name:

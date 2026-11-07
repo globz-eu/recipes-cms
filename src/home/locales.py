@@ -14,4 +14,6 @@ def get_requested_locale(request: Request) -> Locale:
     try:
         return Locale.objects.get(language_code=language_code)
     except Locale.DoesNotExist:
-        raise ValidationError({"locale": [f"Unknown locale '{language_code}'."]})
+        raise ValidationError(
+            {"locale": [f"Unknown locale '{language_code}'."]}
+        ) from None
