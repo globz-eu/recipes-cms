@@ -1,3 +1,6 @@
+from typing import Any
+
+from django.db.models import QuerySet
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action
@@ -26,13 +29,13 @@ class RecipeViewSet(ReadOnlyModelViewSet):
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsEditorOrAdmin]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[RecipePage]:
         queryset = super().get_queryset()
         if self.action == "list" and "locale" in self.request.query_params:
             queryset = queryset.filter(locale=get_requested_locale(self.request))
         return queryset
 
-    def list(self, request: Request, *args, **kwargs) -> Response:
+    def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Returns the recipes of the locale given by ?locale= as a list. Without
         the parameter, returns all recipes as {"locales": {<code>: [...]}}.
@@ -43,7 +46,7 @@ class RecipeViewSet(ReadOnlyModelViewSet):
         recipes = self.get_serializer(
             self.filter_queryset(self.get_queryset()), many=True
         )
-        by_locale = {
+        by_locale: dict[str, list[Any]] = {
             code: [] for code in Locale.objects.values_list("language_code", flat=True)
         }
         for recipe in recipes.data:

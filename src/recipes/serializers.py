@@ -144,7 +144,7 @@ class BulkUploadSerializer(serializers.Serializer):
 
 def load_json_upload(file: UploadedFile) -> object:
     """Decodes an uploaded JSON file, raising a ValidationError for bad files."""
-    if file.size > MAX_UPLOAD_SIZE:
+    if file.size is not None and file.size > MAX_UPLOAD_SIZE:
         raise serializers.ValidationError(
             {"file": [f"File too large; the maximum is {MAX_UPLOAD_SIZE} bytes."]}
         )

@@ -1,5 +1,7 @@
 import json
+from argparse import ArgumentParser
 from pathlib import Path
+from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError
 
@@ -14,10 +16,10 @@ class Command(BaseCommand):
         "locale; the import is all-or-nothing."
     )
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: ArgumentParser) -> None:
         parser.add_argument("path", type=Path, help="Path to the JSON file.")
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         path = options["path"]
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
