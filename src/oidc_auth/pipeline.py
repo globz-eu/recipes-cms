@@ -60,7 +60,6 @@ def enforce_zitadel_org(
     owner = read_claim(backend, response, ZITADEL_RESOURCE_OWNER_CLAIM)
     if owner is None or owner != settings.ZITADEL_ROLE_ORG_ID:
         raise OrgMismatch(backend)
-    return
 
 
 def enforce_email_ownership(
@@ -98,7 +97,6 @@ def enforce_email_ownership(
         raise EmailNotVerified(backend)
     if email_owner(email, exclude=user) is not None:
         raise EmailOwnedElsewhere(backend)
-    return
 
 
 def create_user(
@@ -179,4 +177,3 @@ def sync_roles(
         sorted(roles),
         sorted(wanted),
     )
-    return
