@@ -10,6 +10,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from social_django.models import UserSocialAuth
 
 from oidc_auth.config import LOCAL
 from oidc_auth.providers import enabled_social_providers, provider_for_backend
@@ -33,14 +34,17 @@ class CustomLogoutView(View):
             or settings.LOGOUT_REDIRECT_URL
         )
 
-    def get_social_link(self, request: HttpRequest):
+    def get_social_link(self, request: HttpRequest) -> UserSocialAuth | None:
         """The social link of the session's sign-in, else the newest link."""
-        links = request.user.social_auth.order_by("-pk")
+        # Callers check is_authenticated; social_auth is added by social_django.
+        links = request.user.social_auth.order_by(  # type: ignore[union-attr]
+            "-pk"
+        )
         path = request.session.get(BACKEND_SESSION_KEY)
         if path:
             try:
-                name = load_backend(path).name
-            except ImportError, AttributeError, ValueError:
+                name = getattr(load_backend(path), "name", None)
+            except ImportError, ValueError:
                 name = None
             link = links.filter(provider=name).first() if name else None
             if link:
@@ -56,7 +60,7 @@ class CustomLogoutView(View):
         provider = provider_for_backend(social.provider) if social else None
         if provider is not None and provider.id not in settings.AUTH_PROVIDERS:
             provider = None
-        if provider is None:
+        if social is None or provider is None:
             logger.info("No social provider for user, performing regular logout")
             logout(request)
             return redirect(redirect_url)

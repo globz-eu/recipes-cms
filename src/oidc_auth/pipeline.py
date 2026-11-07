@@ -8,8 +8,10 @@ from typing import TYPE_CHECKING, Any
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured
+from social_core.backends.base import BaseAuth
 from social_core.exceptions import AuthAlreadyAssociated
 from social_core.pipeline.user import create_user as social_create_user
+from social_core.strategy import BaseStrategy
 
 from oidc_auth.backends import ZitadelOpenIdConnect
 from oidc_auth.exceptions import (
@@ -34,14 +36,14 @@ logger = logging.getLogger(__name__)
 ADMIN_ROLE = "admin"
 
 
-def _is_verified(value: Any) -> bool:
+def _is_verified(value: object) -> bool:
     if isinstance(value, str):
         return value.lower() == "true"
     return value is True
 
 
 def enforce_zitadel_org(
-    backend: Any, response: dict[str, Any], *args: Any, **kwargs: Any
+    backend: BaseAuth, response: dict[str, Any], *args: Any, **kwargs: Any
 ) -> None:
     """
     Refuse a Zitadel login unless its user is owned by ZITADEL_ROLE_ORG_ID.
@@ -62,7 +64,7 @@ def enforce_zitadel_org(
 
 
 def enforce_email_ownership(
-    backend: Any,
+    backend: BaseAuth,
     details: dict[str, Any],
     response: dict[str, Any],
     user: AbstractUser | None = None,
@@ -100,9 +102,9 @@ def enforce_email_ownership(
 
 
 def create_user(
-    strategy: Any,
+    strategy: BaseStrategy,
     details: dict[str, Any],
-    backend: Any,
+    backend: BaseAuth,
     user: AbstractUser | None = None,
     *args: Any,
     **kwargs: Any,
@@ -116,7 +118,14 @@ def create_user(
     social_django reports as ``AuthAlreadyAssociated``.
     """
     try:
-        return social_create_user(strategy, details, backend, user, *args, **kwargs)
+        return social_create_user(
+            strategy,
+            details,
+            backend,
+            user,  # type: ignore[arg-type]  # AbstractUser satisfies UserProtocol at runtime
+            *args,
+            **kwargs,
+        )
     except AuthAlreadyAssociated as error:
         if email_owner(details.get("email") or "") is not None:
             raise EmailOwnedElsewhere(backend) from error
@@ -124,7 +133,7 @@ def create_user(
 
 
 def sync_roles(
-    backend: Any,
+    backend: BaseAuth,
     user: AbstractUser | None,
     response: dict[str, Any],
     *args: Any,

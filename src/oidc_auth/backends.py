@@ -1,6 +1,10 @@
+from typing import Any
+
 from django.conf import settings
 from django.contrib.auth.backends import ModelBackend
+from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured
+from django.http import HttpRequest
 from social_core.backends.open_id_connect import OpenIdConnectAuth
 
 ZITADEL_ORG_SCOPE_PREFIX = "urn:zitadel:iam:org:id:"
@@ -11,7 +15,13 @@ class PermissionsOnlyBackend(ModelBackend):
     """Never authenticates; keeps group/user permissions working when password
     login is disabled."""
 
-    def authenticate(self, request, username=None, password=None, **kwargs):
+    def authenticate(
+        self,
+        request: HttpRequest | None,
+        username: str | None = None,
+        password: str | None = None,
+        **kwargs: Any,
+    ) -> User | None:
         return None
 
 
