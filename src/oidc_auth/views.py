@@ -40,7 +40,7 @@ class CustomLogoutView(View):
         if path:
             try:
                 name = load_backend(path).name
-            except (ImportError, AttributeError, ValueError):
+            except ImportError, AttributeError, ValueError:
                 name = None
             link = links.filter(provider=name).first() if name else None
             if link:
