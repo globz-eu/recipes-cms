@@ -78,7 +78,8 @@ def serve_media(request: Request, image_path: str) -> StreamingHttpResponse:
         )
     except ClientError as exc:
         if exc.response["Error"]["Code"] in ("NoSuchKey", "404"):
-            raise Http404
+            # The S3 error is an implementation detail; the client only sees 404.
+            raise Http404 from None
         raise
 
     content_type = obj.get("ContentType", "application/octet-stream")
@@ -112,10 +113,9 @@ def get_image_type(image: str) -> str | None:
     """
     if re.match(r"^images/", image):
         return "rendition"
-    elif re.match(r"^original_images/", image):
+    if re.match(r"^original_images/", image):
         return "original"
-    else:
-        return None
+    return None
 
 
 def get_db_image(requested_image: str, image_type: str) -> bool:
@@ -127,7 +127,10 @@ def get_db_image(requested_image: str, image_type: str) -> bool:
     match image_type:
         case "rendition":
             try:
-                RenditionModel.objects.get(file=requested_image).image
+                rendition = RenditionModel.objects.get(file=requested_image)
+                # Load the related image (one query), as before; only the lookup
+                # matters, the loaded image itself is not used.
+                _ = rendition.image
                 return True
             except RenditionModel.DoesNotExist:
                 return False
