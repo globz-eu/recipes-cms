@@ -16,7 +16,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "django-stubs>=6.1.2",
+    "djangorestframework-stubs>=3.18.2",
     "invoke>=2.2.1",
+    "mypy>=2.4.1",
     "ruff>=0.15.1",
 ]
 
@@ -82,3 +85,38 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.14"
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+mypy_path = "src"
+files = ["src", "tasks.py"]
+explicit_package_bases = true
+namespace_packages = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["*.tests.*", "*.migrations.*"]
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = [
+    "wagtail.*",
+    "social_core.*",
+    "social_django.*",
+    "modelcluster.*",
+    "storages.*",
+    "wagtail_storages.*",
+    "invoke.*",
+    "boto3.*",
+    "botocore.*",
+    "treebeard.*",
+    "modelsearch.*",
+    "taggit.*",
+]
+ignore_missing_imports = true
+
+[tool.django-stubs]
+django_settings_module = "recipe_cms.settings.dev"
