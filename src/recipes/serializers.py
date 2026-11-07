@@ -151,6 +151,10 @@ def load_json_upload(file: UploadedFile) -> object:
     try:
         return json.loads(file.read().decode("utf-8"))
     except UnicodeDecodeError:
-        raise serializers.ValidationError({"file": ["File must be UTF-8 encoded."]})
+        raise serializers.ValidationError(
+            {"file": ["File must be UTF-8 encoded."]}
+        ) from None
     except json.JSONDecodeError as error:
-        raise serializers.ValidationError({"file": [f"Invalid JSON: {error}"]})
+        raise serializers.ValidationError(
+            {"file": [f"Invalid JSON: {error}"]}
+        ) from error

@@ -22,9 +22,9 @@ class Command(BaseCommand):
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except OSError as error:
-            raise CommandError(f"Cannot read {path}: {error}")
+            raise CommandError(f"Cannot read {path}: {error}") from error
         except (UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise CommandError(f"Invalid JSON in {path}: {error}")
+            raise CommandError(f"Invalid JSON in {path}: {error}") from error
         if isinstance(payload, list):
             payload = {"recipes": payload}
 
@@ -34,7 +34,9 @@ class Command(BaseCommand):
         try:
             result = import_recipes(serializer.validated_data["recipes"])
         except RecipeImportError as error:
-            raise CommandError(json.dumps(error.errors, indent=2, default=str))
+            raise CommandError(
+                json.dumps(error.errors, indent=2, default=str)
+            ) from error
 
         self.stdout.write(
             self.style.SUCCESS(
