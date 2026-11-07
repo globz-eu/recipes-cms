@@ -2,9 +2,10 @@
 
 These rules apply to every change. Ruff and mypy enforce the measurable ones (`uv run invoke
 lint`). Don't silence a finding to get past it. Restructure the code instead. `noqa` and
-`type: ignore` are only acceptable for code you don't control (a Django/DRF override, an untyped
-library), and need a code and a reason: `# noqa: PLR0913 -- parameters are invoke CLI flags`,
-`# type: ignore[attr-defined]  # reverse accessor added by social_django`. mypy's
+`type: ignore` need a code and a reason: `# noqa: PLR0913 -- parameters are invoke CLI flags`,
+`# type: ignore[attr-defined]  # reverse accessor added by social_django`. Use them only for code
+you don't control (a Django/DRF override, an untyped library) or a deliberate convention (star
+imports in the settings modules), never to get past a finding. mypy's
 `warn_unused_ignores` flags an ignore that is no longer needed, so remove it then.
 Django/Wagtail-specific rules are in `backend.md`.
 
@@ -36,11 +37,12 @@ Django/Wagtail-specific rules are in `backend.md`.
 
 ## Size limits
 
-- Guidance, not enforced: files ≤ 200 lines, functions ≤ 60 lines, ≤ 3 parameters, nesting
-  depth ≤ 3. Blank lines and comments don't count.
+- Guidance, not enforced: files ≤ 200 lines, functions ≤ 60 lines, nesting depth ≤ 3, and
+  ≤ 3 parameters for new functions. Blank lines and comments don't count.
 - Enforced by ruff: cyclomatic complexity ≤ 10 (`C901`), ≤ 12 branches, ≤ 5 arguments. The
-  argument limit exists for Django/DRF/invoke signatures you can't change; in your own code, over
-  3 parameters means passing a dataclass or `TypedDict`.
+  argument limit exists for Django/DRF/invoke signatures you can't change. For new functions over
+  3 parameters, prefer passing a dataclass or `TypedDict`. Existing functions over 3 parameters
+  (e.g. `rewrite_env`) aren't changed just for this.
 - Approaching a limit means a function or module does too much. Split it by responsibility, not
   by line count. Existing large files aren't split for their own sake; when you change one
   substantially, split along responsibilities.
