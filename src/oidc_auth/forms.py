@@ -4,7 +4,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from wagtail.users.forms import UserCreationForm, UserEditForm
 
-from oidc_auth.ownership import email_owner
+from oidc_auth.ownership import email_owner, has_social_login
 from oidc_auth.providers import provider_for_backend
 
 
@@ -34,6 +34,6 @@ class OwnedEmailUserEditForm(EmailOwnershipMixin, UserEditForm):
         # Wagtail drops the password fields (and skips them in save()) when this
         # is false. A social user never gets a password: it would be a second
         # sign-in method next to the provider.
-        if self.instance.pk and self.instance.social_auth.exists():
+        if self.instance.pk and has_social_login(self.instance):
             return False
         return super().password_enabled

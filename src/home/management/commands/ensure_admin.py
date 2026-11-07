@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 from django.db import transaction
 
-from oidc_auth.ownership import email_owner
+from oidc_auth.ownership import email_owner, has_social_login
 
 
 class Command(BaseCommand):
@@ -41,14 +41,14 @@ class Command(BaseCommand):
 
         User = get_user_model()
         user, created = User.objects.get_or_create(**{User.USERNAME_FIELD: username})
-        if user.social_auth.exists():
+        if has_social_login(user):
             raise CommandError(
                 f"admin '{username}': this account signs in through a social "
                 "provider and cannot get a password."
             )
         if email is not None:
             owner = email_owner(email, exclude=user)
-            if owner is not None and owner.social_auth.exists():  # type: ignore[attr-defined]  # reverse accessor added by social_django
+            if owner is not None and has_social_login(owner):
                 raise CommandError(
                     f"admin '{username}': {email} belongs to an account that "
                     "signs in through a social provider."

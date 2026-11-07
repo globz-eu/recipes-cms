@@ -7,6 +7,7 @@ from django.db.models import Value
 from django.db.models.functions import Lower
 
 if TYPE_CHECKING:
+    from django.contrib.auth.base_user import AbstractBaseUser
     from django.contrib.auth.models import AbstractUser
 
 
@@ -26,3 +27,8 @@ def email_owner(
     if exclude is not None:
         users = users.exclude(pk=exclude.pk)
     return users.order_by("pk").first()
+
+
+def has_social_login(user: AbstractBaseUser) -> bool:
+    """Whether the user signs in through a social provider."""
+    return user.social_auth.exists()  # type: ignore[attr-defined]  # reverse accessor added by social_django
