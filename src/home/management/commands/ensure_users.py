@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -25,7 +26,7 @@ class Command(BaseCommand):
     )
 
     @transaction.atomic
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         User = get_user_model()
         for role, (is_superuser, group_name) in ROLES.items():
             username = os.getenv(f"DJANGO_{role}_USERNAME")
@@ -40,7 +41,7 @@ class Command(BaseCommand):
                 )
 
             user, created = User.objects.get_or_create(
-                **{User.USERNAME_FIELD: username}
+                **{User.USERNAME_FIELD: username}  # type: ignore[arg-type]  # stubs read the kwargs as the Mapping overload
             )
             if user.social_auth.exists():
                 raise CommandError(
@@ -49,7 +50,7 @@ class Command(BaseCommand):
                 )
             if email is not None:
                 owner = email_owner(email, exclude=user)
-                if owner is not None and owner.social_auth.exists():
+                if owner is not None and owner.social_auth.exists():  # type: ignore[attr-defined]  # reverse accessor added by social_django
                     raise CommandError(
                         f"{role.lower()} '{username}': {email} belongs to an "
                         "account that signs in through a social provider."

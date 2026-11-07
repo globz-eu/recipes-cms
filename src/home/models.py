@@ -14,13 +14,13 @@ class HomePage(Page):
     # "copy" in the admin, clean() is the backstop for everything else. There
     # is no database constraint, so concurrent creates are not guarded.
     @classmethod
-    def can_create_at(cls, parent):
+    def can_create_at(cls, parent: Page) -> bool:
         return (
             super().can_create_at(parent)
             and not cls.objects.filter(locale_id=parent.locale_id).exists()
         )
 
-    def clean(self):
+    def clean(self) -> None:
         super().clean()
         locale_id = self.locale_id or self.get_default_locale().pk
         if HomePage.objects.filter(locale_id=locale_id).exclude(pk=self.pk).exists():

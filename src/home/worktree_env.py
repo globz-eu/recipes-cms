@@ -4,6 +4,7 @@ Kept free of invoke and git so it can be tested on its own.
 """
 
 import re
+from collections.abc import Collection
 
 # Derived again from NGINX_HOST_PORT once removed (see compose.yml).
 DERIVED_KEYS = ("S3_CUSTOM_DOMAIN", "WAGTAILADMIN_BASE_URL")
@@ -24,12 +25,12 @@ DEFAULT_POSTGRES_PORT = 5432
 DEFAULT_DEV_SERVER_PORT = 5173
 
 
-def default_project_name(directory_name):
+def default_project_name(directory_name: str) -> str:
     """Compose project name from a worktree directory name."""
     return sanitize_name(f"recipes-cms-{directory_name}")
 
 
-def sanitize_name(name):
+def sanitize_name(name: str) -> str:
     """Lowercase, keep [a-z0-9_-], and start with a letter or digit."""
     cleaned = re.sub(r"[^a-z0-9_-]+", "-", name.lower()).strip("-_")
     if not cleaned:
@@ -37,23 +38,28 @@ def sanitize_name(name):
     return cleaned
 
 
-def default_postgres_port(port):
+def default_postgres_port(port: int) -> int:
     """Keep the offset between the nginx and postgres defaults (8081 -> 5433)."""
     return port - DEFAULT_NGINX_PORT + DEFAULT_POSTGRES_PORT
 
 
-def default_dev_server_port(port):
+def default_dev_server_port(port: int) -> int:
     """Pair a frontend dev server port with the nginx port (8081 -> 5174)."""
     return port - DEFAULT_NGINX_PORT + DEFAULT_DEV_SERVER_PORT
 
 
-def dev_frontend_origins(dev_server_port):
+def dev_frontend_origins(dev_server_port: int) -> str:
     """Dev server origins to trust: 5173 (any stack) plus this stack's port."""
     ports = dict.fromkeys((DEFAULT_DEV_SERVER_PORT, dev_server_port))
     return ",".join(f"http://localhost:{p}" for p in ports)
 
 
-def check_ports(port, db_port, dev_server_port=None, derived=()):
+def check_ports(
+    port: int,
+    db_port: int,
+    dev_server_port: int | None = None,
+    derived: Collection[str] = (),
+) -> None:
     """Raise ValueError unless the ports are usable for an extra stack.
 
     `dev_server_port` (the frontend dev server) may be 5173: it is a valid
@@ -63,7 +69,7 @@ def check_ports(port, db_port, dev_server_port=None, derived=()):
     `port`; an
     out-of-range error for them suggests passing the option explicitly.
     """
-    checks = [
+    checks: list[tuple[str, int, int | None]] = [
         ("--port", port, DEFAULT_NGINX_PORT),
         ("--db-port", db_port, DEFAULT_POSTGRES_PORT),
     ]
@@ -87,12 +93,18 @@ def check_ports(port, db_port, dev_server_port=None, derived=()):
         )
 
 
-def _key(line):
+def _key(line: str) -> str | None:
     match = re.match(r"\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=", line)
     return match.group(1) if match else None
 
 
-def rewrite_env(text, name, port, db_port, dev_server_port=None):
+def rewrite_env(
+    text: str,
+    name: str,
+    port: int,
+    db_port: int,
+    dev_server_port: int | None = None,
+) -> str:
     """Return `text` with the stack-specific variables set for a worktree.
 
     Existing definitions of the managed variables are replaced, the derived URLs
