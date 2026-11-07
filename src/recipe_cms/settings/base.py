@@ -12,7 +12,9 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 import os
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 from oidc_auth.config import (
     authentication_backends,
@@ -21,7 +23,7 @@ from oidc_auth.config import (
 )
 
 
-def env_list(name: str, default=()) -> list[str]:
+def env_list(name: str, default: Iterable[str] = ()) -> list[str]:
     """Read a comma-separated environment variable into a list, skipping blanks.
 
     Returns a copy of ``default`` when the variable is unset or has no items.
@@ -261,7 +263,7 @@ STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.AppDirectoriesFinder",
 ]
 
-STATICFILES_DIRS = []
+STATICFILES_DIRS: list[str] = []
 
 STATIC_ROOT = BASE_DIR / "static"
 STATIC_URL = "/static/"
@@ -298,7 +300,7 @@ WAGTAIL_EMAIL_MANAGEMENT_ENABLED = False
 
 # Storage settings
 # See https://docs.djangoproject.com/en/6.0/ref/settings/#std-setting-STORAGES
-STORAGES = {
+STORAGES: dict[str, dict[str, Any]] = {
     "default": {
         "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
     },

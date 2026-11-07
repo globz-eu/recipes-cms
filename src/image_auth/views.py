@@ -1,7 +1,9 @@
 import functools
 import re
+from collections.abc import Iterator
 
 import boto3
+from botocore.client import BaseClient
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from django.conf import settings
@@ -10,6 +12,7 @@ from rest_framework import permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
+from rest_framework.views import APIView
 from wagtail.images.models import Image
 
 from home.permissions import IsEditorOrAdmin
@@ -29,7 +32,7 @@ class MediaAccessPermission(permissions.BasePermission):
       required role/group membership.
     """
 
-    def has_permission(self, request: Request, view) -> bool:  # type: ignore[override]
+    def has_permission(self, request: Request, view: APIView) -> bool:
         image_path = view.kwargs.get("image_path", "")
         image_type = get_image_type(image_path)
         if not image_type:
@@ -42,7 +45,7 @@ class MediaAccessPermission(permissions.BasePermission):
 
 
 @functools.lru_cache(maxsize=1)
-def _get_s3_client():
+def _get_s3_client() -> BaseClient:
     return boto3.client(
         "s3",
         aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
@@ -84,7 +87,7 @@ def serve_media(request: Request, image_path: str) -> StreamingHttpResponse:
 
     content_type = obj.get("ContentType", "application/octet-stream")
 
-    def _iter_body():
+    def _iter_body() -> Iterator[bytes]:
         body = obj["Body"]
         while chunk := body.read(_S3_CHUNK_SIZE):
             yield chunk
