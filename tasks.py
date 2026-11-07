@@ -103,7 +103,7 @@ def _main_worktree(c):
         ),
     }
 )
-def worktree_env(
+def worktree_env(  # noqa: PLR0913 -- parameters are invoke CLI flags
     c,
     port=None,
     db_port=None,
