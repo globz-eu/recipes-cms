@@ -393,6 +393,8 @@ The frontend lives in [recipes-frontend](https://github.com/globz-eu/recipes-fro
 its latest release and serves it at `/frontend/`. Its build is environment-independent: deployments use a
 release and write a `config.json` pointing it at the API host.
 Releases are built by CI on `v*.*.*` tags (`invoke bump`); see the infrastructure repo's README for deploying.
+After pushing the image, CI dispatches the dev-stack e2e tests in recipes-infrastructure; this needs the
+repository secret `E2E_DISPATCH_TOKEN` (fine-grained PAT, contents write on recipes-infrastructure).
 
 ## Authentication Flow
 

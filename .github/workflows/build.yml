@@ -36,3 +36,13 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: rg.nl-ams.scw.cloud/namespace-relaxed-faraday/recipes-cms:${{ steps.tag.outputs.version }}
+
+      - name: Trigger e2e tests in recipes-infrastructure
+        env:
+          GH_TOKEN: ${{ secrets.E2E_DISPATCH_TOKEN }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: >-
+          gh api repos/globz-eu/recipes-infrastructure/dispatches
+          -f event_type=component-released
+          -f "client_payload[repo]=$REPO_NAME"
+          -f "client_payload[version]=$GITHUB_REF_NAME"
