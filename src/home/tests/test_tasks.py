@@ -181,7 +181,10 @@ class DevStackCommandsTestCase(SimpleTestCase):
         command = self.only_command()
         self.assertIn("dev-stack.sh compose", command)
         self.assertIn(self.compose, command)
-        self.assertIn("run --build --rm wagtail", command)
+        self.assertIn("run --build --rm", command)
+        self.assertIn(
+            "-e DJANGO_SETTINGS_MODULE=recipe_cms.settings.test wagtail", command
+        )
         self.assertIn("uv run manage.py test recipes --verbosity=2", command)
         self.context.cd.assert_called_once_with(str(tasks.HERE))
 

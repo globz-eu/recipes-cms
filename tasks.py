@@ -118,10 +118,12 @@ def test(
 ) -> None:
     """Run the Django test suite: on the host with SQLite, or --postgres in Docker."""
     if postgres:
-        # run --build keeps the image in step with src/; dev settings use Postgres.
+        # run --build keeps the image in step with src/. The image bakes in dev
+        # settings (S3); test settings keep Postgres since POSTGRES_HOST is set.
         _dev_stack(
             c,
-            f"compose -f {COMPOSE_DEV} run --build --rm wagtail"
+            f"compose -f {COMPOSE_DEV} run --build --rm"
+            " -e DJANGO_SETTINGS_MODULE=recipe_cms.settings.test wagtail"
             f" uv run manage.py test {label} --verbosity={verbosity}",
             pty=sys.stdout.isatty(),
         )
