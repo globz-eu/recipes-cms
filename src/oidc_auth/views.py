@@ -11,6 +11,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from social_django.models import UserSocialAuth
+from wagtail.admin.views.account import LoginView
 
 from oidc_auth.config import LOCAL
 from oidc_auth.providers import enabled_social_providers, provider_for_backend
@@ -73,6 +74,20 @@ class CustomLogoutView(View):
     def post(self, request: HttpRequest) -> HttpResponse:
         logger.info(f"CustomLogoutView POST: request received for user: {request.user}")
         return self.get(request)
+
+
+class LocalLoginView(LoginView):
+    """
+    Wagtail's login view, also following `next` to `ALLOWED_REDIRECT_HOSTS`
+    (e.g. a cross-origin frontend). Django keeps checking the scheme: a secure
+    request refuses a plain-HTTP `next`.
+    """
+
+    def get_success_url_allowed_hosts(self) -> set[str]:
+        # Read per request (not a class attribute) so settings changes apply.
+        return super().get_success_url_allowed_hosts() | set(
+            settings.ALLOWED_REDIRECT_HOSTS
+        )
 
 
 class AuthProvidersView(APIView):
