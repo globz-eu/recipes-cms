@@ -262,7 +262,7 @@ uv run invoke test --label=oidc_auth    # one app, module or test
 uv run invoke test --postgres           # in the dev stack's wagtail container, against Postgres
 ```
 
-`--postgres` builds the image from this checkout and runs the tests in a one-off `wagtail` container of the dev stack (it needs `.env` and the recipes-infrastructure clone, and uses the stack's database). Use it for changes that depend on Postgres behaviour. Changes touching email uniqueness (the `LOWER(email)` index, `oidc_auth` migration 0001, `enforce_email_ownership`, user forms) or other Postgres-specific behaviour must be verified with `uv run invoke test --postgres`, because no CI runs tests and the index test is skipped on SQLite.
+`--postgres` builds the image from this checkout and runs the tests in a one-off `wagtail` container of the dev stack (it needs `.env` and the recipes-infrastructure clone, and uses the stack's database). Use it for changes that depend on Postgres behaviour. Changes touching email uniqueness (the `LOWER(email)` index, `oidc_auth` migration 0001, `enforce_email_ownership`, user forms) or other Postgres-specific behaviour must be verified with `uv run invoke test --postgres`, because CI runs only lint and the SQLite tests (on every push) and the index test is skipped on SQLite.
 
 ### Invoke Tasks
 
