@@ -30,7 +30,7 @@ Spec: `docs/plans/2026-11-08-ci-on-every-push.spec.md`.
 ## Implementation steps
 
 1. Confirm `manage.py` default settings module; if not `settings.test`, set `DJANGO_SETTINGS_MODULE` in the test step env.
-2. Add `ci.yml`: `on.push.branches: ["**"]`, `actions/checkout@v4`, `astral-sh/setup-uv@v6` with `python-version: "3.14"` and `enable-cache: true`.
+2. Add `ci.yml`: `on.push.branches: ["**"]`, `actions/checkout@v4`, `astral-sh/setup-uv@v10.3.3` (no floating major tag exists) with `python-version: "3.14"` and `enable-cache: true`.
 3. Add steps `uv sync --locked`, `uv run invoke lint`, `uv run invoke test`.
 4. Commit: "Run lint and tests in CI on every push".
 5. Update the CLAUDE.md and README.md wording; commit: "Document CI lint and tests".
@@ -44,7 +44,7 @@ Spec: `docs/plans/2026-11-08-ci-on-every-push.spec.md`.
 
 ## Risks and open questions
 
-- Verify the `setup-uv` major (v6 assumed) is current when implementing.
+- `setup-uv` pinned to v10.3.3, its current release when implemented.
 - Python 3.14 availability via setup-uv; fall back to `.python-version` if not.
 - Any `uv.lock` drift fails `--locked`; accepted as intended.
 - Open: add `concurrency` cancel-in-progress for superseded pushes? Left out (YAGNI).
