@@ -8,13 +8,13 @@ The import above is the shared recipes architecture file; it resolves only if `~
 
 ## Commands
 
-The dev stack (Postgres, Garage S3, nginx, Wagtail, frontend release) is defined in the sibling repo recipes-infrastructure (`dev/compose.yml`, driven by `scripts/dev-stack.sh`; see its README, "Local dev environment"). This repo only adds `compose.dev.yml`, which builds this checkout and syncs `src/` into the `wagtail` container. Clone recipes-infrastructure next to this repo, or set `RECIPES_INFRA_DIR` (shell or `.env`) to its checkout. Python deps are managed with `uv` (Python 3.14+). `.env` is required for the stack: create it with `../recipes-infrastructure/scripts/dev-stack.sh env --port 8080` (from `dev/.env.example`) and fill in the secrets. The tests do not need it.
+The dev stack (Postgres, Garage S3, nginx, Wagtail, frontend release) is defined in the sibling repo recipes-infrastructure (`dev/compose.yml`, driven by `scripts/dev-stack.sh`; see its README, "Local dev environment"). This repo only adds `compose.dev.yml`, which builds this checkout and syncs `src/` into the `wagtail` container. Clone recipes-infrastructure next to this repo, or set `RECIPES_INFRA_DIR` (shell or `.env`) to its checkout. Python deps are managed with `uv` (Python 3.14+). `.env` is required for the stack: in the main checkout run `cp ../recipes-infrastructure/dev/.env.example .env && chmod 600 .env` and fill in the secrets (`dev-stack.sh env` is only for extra worktrees). `RECIPES_INFRA_DIR` in `.env` only helps once `.env` exists; use the shell for the first setup. The tests do not need it.
 
 **Tests run on the host with SQLite by default** (`uv run invoke test`, no Docker, no `.env`). `uv run invoke test --postgres` runs them in a one-off `wagtail` container of the dev stack against Postgres; use it for Postgres-specific behaviour.
 
-**When testing against the dev environment, start it with `uv run invoke dev`, not plain `docker compose up -d`.** Only watch mode syncs `src/` into the container; otherwise the container runs stale code and tests silently run against old files. Other compose commands: `../recipes-infrastructure/scripts/dev-stack.sh compose ARGS` (run from this directory, it identifies the stack).
+**When testing against the dev environment, start it with `uv run invoke dev`, not plain `docker compose up -d`.** Only watch mode syncs `src/` into the container; otherwise the container runs stale code and tests silently run against old files. Other compose commands: `$DEV_STACK compose ARGS` (`DEV_STACK="${RECIPES_INFRA_DIR:-<main checkout>/../recipes-infrastructure}"/scripts/dev-stack.sh`; `../recipes-infrastructure` does not resolve from a worktree; the `invoke` tasks resolve it themselves) (run from this directory, it identifies the stack).
 
-**One stack per git worktree, so branches can be tested in parallel.** In an extra worktree run `../recipes-infrastructure/scripts/dev-stack.sh env --port 8081` (writes its `.env` from the main worktree's with a unique project name, ports, cookie names and `DEV_FRONTEND_ORIGINS`; options and port rules are in the recipes-infrastructure README, "Parallel stacks (git worktrees)"), then `uv run invoke dev`. Only nginx and postgres are published; use `localhost:<NGINX_HOST_PORT>`. Each stack has an empty Garage: provision it via `dev-stack.sh compose` (README, "Provisioning Garage"). **Whoever starts a stack stops it:** stop the watch process, then `uv run invoke down` (`--volumes` for throwaway worktrees, before removing them).
+**One stack per git worktree, so branches can be tested in parallel.** In an extra worktree run `$DEV_STACK env --port 8081` (writes its `.env` from the main worktree's with a unique project name, ports, cookie names and `DEV_FRONTEND_ORIGINS`; options and port rules are in the recipes-infrastructure README, "Parallel stacks (git worktrees)"), then `uv run invoke dev`. Only nginx and postgres are published; use `localhost:<NGINX_HOST_PORT>`. Each stack has an empty Garage: provision it via `dev-stack.sh compose` (recipes-cms README, "Provisioning Garage"). **Whoever starts a stack stops it:** stop the watch process, then `uv run invoke down` (`--volumes` for throwaway worktrees, before deleting them; `invoke test --postgres` also leaves the database container running, so run `invoke down` afterwards).
 
 ```bash
 uv run invoke dev [--build]         # dev-stack.sh up --watch --skip-lookup CMS_VERSION -f compose.dev.yml (src/ is synced)
@@ -28,7 +28,7 @@ uv run invoke bump --part minor     # bump version, commit, tag vX.Y.Z (tag push
 (cd src && uv run manage.py test recipes.tests.test_bulk_upload)
 (cd src && uv run manage.py test recipes.tests.test_bulk_upload.SomeTest.test_name)
 
-# Management commands in the running stack (DEV_STACK=../recipes-infrastructure/scripts/dev-stack.sh)
+# Management commands in the running stack (DEV_STACK as above)
 $DEV_STACK compose exec wagtail uv run manage.py migrate
 $DEV_STACK compose exec wagtail uv run manage.py import_recipes recipes.json
 ```

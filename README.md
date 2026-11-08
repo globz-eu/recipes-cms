@@ -157,7 +157,7 @@ $DEV_STACK compose exec wagtail uv run manage.py import_recipes recipes.json
 
 - [Docker](https://docs.docker.com/get-docker/) with Docker Compose
 - [uv](https://docs.astral.sh/uv/) (Python 3.14+)
-- A clone of [recipes-infrastructure](https://github.com/globz-eu/recipes-infrastructure) next to this repository (siblings under one parent folder). It owns the local dev stack (Postgres, Garage S3, nginx, Wagtail and the recipes-frontend release); this repository only adds a backend override, [compose.dev.yml](compose.dev.yml), that builds this checkout instead of pulling the released image and syncs `src/` into the container. If the clone lives elsewhere, set `RECIPES_INFRA_DIR` (in the shell or in `.env`) to its path.
+- A clone of [recipes-infrastructure](https://github.com/globz-eu/recipes-infrastructure) next to this repository (siblings under one parent folder). It owns the local dev stack (Postgres, Garage S3, nginx, Wagtail and the recipes-frontend release); this repository only adds a backend override, [compose.dev.yml](compose.dev.yml), that builds this checkout instead of pulling the released image and syncs `src/` into the container. If the clone lives elsewhere, set `RECIPES_INFRA_DIR` to its path. In `.env` it only helps once `.env` exists, so use the shell for the first setup. The `invoke` tasks resolve the clone themselves (sibling of the main worktree, or `RECIPES_INFRA_DIR` from the shell or `.env`); raw `dev-stack.sh` commands below spell out the same rule, because `../recipes-infrastructure` does not resolve from a worktree under `recipes-cms-worktrees/<name>`.
 
 ```
 recipes/
@@ -170,13 +170,13 @@ Everything about the stack itself (config files, environment variables, versions
 
 ### Environment Variables
 
-Create `.env` in the project root with `dev-stack.sh env`, which starts from the recipes-infrastructure `dev/.env.example` and writes a mode-600 file:
+In the main checkout, create `.env` in the project root from the recipes-infrastructure `dev/.env.example`:
 
 ```bash
-../recipes-infrastructure/scripts/dev-stack.sh env --port 8080
+cp ../recipes-infrastructure/dev/.env.example .env && chmod 600 .env
 ```
 
-(For an extra worktree see "Parallel stacks" below.) Then fill in the secrets, the Auth0/Zitadel values and the `DJANGO_*` local users; `dev/.env.example` in recipes-infrastructure lists and explains every variable. `FRONTEND_VERSION` stays unset (the newest release is looked up) unless you pin it; `CMS_VERSION` is not looked up by `invoke dev`, which builds wagtail from source. `S3_CUSTOM_DOMAIN` and `WAGTAILADMIN_BASE_URL` are derived from `NGINX_HOST_PORT`; set them only to override. Production-only variables are in "Deployment".
+(`dev-stack.sh env` is only for extra worktrees, see "Parallel stacks" below; in the main checkout it refuses without `--source` and rejects port 8080 as the main stack's.) Then fill in the secrets, the Auth0/Zitadel values and the `DJANGO_*` local users; `dev/.env.example` in recipes-infrastructure lists and explains every variable. `FRONTEND_VERSION` stays unset (the newest release is looked up) unless you pin it; `CMS_VERSION` is not looked up by `invoke dev`, which builds wagtail from source. `S3_CUSTOM_DOMAIN` and `WAGTAILADMIN_BASE_URL` are derived from `NGINX_HOST_PORT`; set them only to override. Production-only variables are in "Deployment".
 
 ### Starting the Stack
 
@@ -193,11 +193,11 @@ This runs `scripts/dev-stack.sh up --watch --skip-lookup CMS_VERSION -f compose.
 A stack is identified by the directory it is started from: its `.env` holds the compose project name, ports and cookie names. In an extra worktree:
 
 ```bash
-../recipes-infrastructure/scripts/dev-stack.sh env --port 8081   # [--db-port N] [--dev-server-port N] [--name NAME] [--source FILE] [--force]
+"${RECIPES_INFRA_DIR:-<main checkout>/../recipes-infrastructure}"/scripts/dev-stack.sh env --port 8081   # [--db-port N] [--dev-server-port N] [--name NAME] [--source FILE] [--force]
 uv run invoke dev
 ```
 
-`env` copies the main worktree's `.env` (or `--source`) and sets a unique project name, ports and cookie names, and the trusted frontend dev server origins (`DEV_FRONTEND_ORIGINS`, paired ports 8081 -> 5174). The port rules, the limits for social login and the frontend dev server (`RECIPES_CMS_PORT=8081 npm run dev` in recipes-frontend) are in the recipes-infrastructure README, "Parallel stacks (git worktrees)".
+`env` copies the main worktree's `.env` (the default `--source`) and sets a unique project name, ports and cookie names, and the trusted frontend dev server origins (`DEV_FRONTEND_ORIGINS`, paired ports 8081 -> 5174). The port rules, the limits for social login and the frontend dev server (`RECIPES_CMS_PORT=8081 npm run dev` in recipes-frontend) are in the recipes-infrastructure README, "Parallel stacks (git worktrees)".
 
 - Each stack has its own database and its own empty Garage, so uploads and browsing media need the Garage provisioning below.
 - **Whoever starts a stack stops it:** see "Stopping the Stack".
@@ -207,7 +207,7 @@ uv run invoke dev
 Run these through the stack's compose wrapper, from this directory:
 
 ```bash
-DEV_STACK=../recipes-infrastructure/scripts/dev-stack.sh   # or $RECIPES_INFRA_DIR/scripts/dev-stack.sh
+DEV_STACK="${RECIPES_INFRA_DIR:-<main checkout>/../recipes-infrastructure}"/scripts/dev-stack.sh
 
 # Open a shell inside the wagtail container
 $DEV_STACK compose exec wagtail /bin/bash
@@ -228,7 +228,7 @@ is read only from `DJANGO_ADMIN_PASSWORD`, so it never shows up in the process l
 shell history:
 
 ```bash
-docker compose exec -e DJANGO_ADMIN_PASSWORD='…' wagtail \
+$DEV_STACK compose exec -e DJANGO_ADMIN_PASSWORD='…' wagtail \
   uv run manage.py ensure_admin --username admin --email admin@example.com
 ```
 
@@ -277,7 +277,7 @@ Common development tasks are automated with [Invoke](https://www.pyinvoke.org/).
 | `invoke lint` | Check code without changing it: `ruff check`, `ruff format --check` and `mypy` (runs on the host) |
 | `invoke bump` | Bump the project version, update the lockfile, and create an annotated git tag (`--part major\|minor\|patch`, default: `patch`) |
 
-`dev`, `down` and `test --postgres` call `scripts/dev-stack.sh` of recipes-infrastructure (found as a sibling, or via `RECIPES_INFRA_DIR`). Any other compose command for the stack goes through `../recipes-infrastructure/scripts/dev-stack.sh compose -f compose.dev.yml ARGS`.
+`dev`, `down` and `test --postgres` call `scripts/dev-stack.sh` of recipes-infrastructure (found as a sibling, or via `RECIPES_INFRA_DIR`). Any other compose command for the stack goes through `$DEV_STACK compose -f compose.dev.yml ARGS` (`DEV_STACK` as in "Running Management Commands").
 
 ```bash
 # Start dev server (rebuild images first)
@@ -302,7 +302,7 @@ uv run invoke down            # dev-stack.sh down
 uv run invoke down --volumes  # dev-stack.sh down -v
 ```
 
-Use `--volumes` before removing a throwaway worktree, or its volumes stay behind.
+Run `uv run invoke down --volumes` before deleting a throwaway worktree, or its volumes stay behind. `uv run invoke test --postgres` leaves the stack's database container running, so run `uv run invoke down` afterwards.
 
 ### Object Storage (Garage)
 
@@ -379,6 +379,7 @@ extra variables:
 | `CORS_ALLOWED_ORIGINS` | Origins allowed to call the API with credentials (the frontend origin) |
 | `SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS` | Extra hosts login/logout may redirect back to (the frontend host) |
 | `STATIC_BUCKET_NAME`, `STATIC_CUSTOM_DOMAIN` | Collect static files to S3 and serve them from the CDN domain |
+| `SECRET_KEY_FALLBACKS` | Comma-separated previous `SECRET_KEY` values, so sessions and signed values survive a key rotation (optional) |
 | `S3_REGION_NAME` | Object storage region (`fr-par` on Scaleway, `garage` locally) |
 | `POSTGRES_SSLMODE` | libpq `sslmode` (`require` for Serverless SQL) |
 | `WAGTAILADMIN_BASE_URL` | Public base URL of the admin |
