@@ -58,8 +58,8 @@ Deployments with `zitadel` enabled must set `ZITADEL_ROLE_ORG_ID` before upgradi
 
 ## Tech Stack
 
-- **Django 6.x**: Web framework
-- **Wagtail 7.3**: CMS framework
+- **Django 6.1**: Web framework
+- **Wagtail 8.1**: CMS framework
 - **Django REST Framework**: API development
 - **Social Auth App Django**: OAuth/OpenID Connect integration
 - **django-storages + wagtail-storages**: S3-compatible media storage via Garage
