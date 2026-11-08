@@ -7,7 +7,14 @@ import sys
 
 def main() -> None:
     """Run administrative tasks."""
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "recipe_cms.settings.dev")
+    # `manage.py test` runs on the host with SQLite (settings.test); an explicit
+    # DJANGO_SETTINGS_MODULE (the containers set one) still wins.
+    default_settings = (
+        "recipe_cms.settings.test"
+        if sys.argv[1:2] == ["test"]
+        else "recipe_cms.settings.dev"
+    )
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", default_settings)
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

@@ -1,3 +1,5 @@
+import os
+import shlex
 import sys
 from pathlib import Path
 from typing import Any
@@ -7,16 +9,8 @@ from invoke.exceptions import Exit
 from invoke.runners import Result
 from invoke.tasks import task
 
-sys.path.insert(0, str(Path(__file__).parent / "src"))
-
-from home.worktree_env import (  # noqa: E402 -- src/ must be on sys.path first
-    check_ports,
-    default_dev_server_port,
-    default_postgres_port,
-    default_project_name,
-    rewrite_env,
-    sanitize_name,
-)
+HERE = Path(__file__).resolve().parent
+COMPOSE_DEV = shlex.quote(str(HERE / "compose.dev.yml"))
 
 
 def _run(c: Context, command: str, **kwargs: Any) -> Result:
@@ -66,25 +60,88 @@ def lint(c: Context) -> None:
         raise Exit("Lint failed.")
 
 
+def _main_worktree(c: Context) -> Path:
+    out = _run(c, "git worktree list --porcelain", hide=True).stdout
+    return Path(out.splitlines()[0].removeprefix("worktree ")).resolve()
+
+
+def _env_file_value(key: str) -> str | None:
+    """Last `KEY=value` in this worktree's .env, if any (invoke does not load it)."""
+    try:
+        lines = (HERE / ".env").read_text().splitlines()
+    except OSError:
+        return None
+    value = None
+    for line in lines:
+        name, sep, raw = line.strip().removeprefix("export ").partition("=")
+        if sep and name.strip() == key:
+            value = raw.strip().strip("\"'")
+    return value
+
+
+def _dev_stack_script(c: Context) -> Path:
+    """The recipes-infrastructure dev-stack.sh; RECIPES_INFRA_DIR overrides the sibling."""
+    configured = os.environ.get("RECIPES_INFRA_DIR") or _env_file_value(
+        "RECIPES_INFRA_DIR"
+    )
+    infra = (
+        Path(configured).expanduser()
+        if configured
+        else _main_worktree(c).parent / "recipes-infrastructure"
+    )
+    script = infra / "scripts" / "dev-stack.sh"
+    if not script.is_file():
+        raise Exit(
+            f"{script} not found. Clone recipes-infrastructure next to this"
+            " repository or set RECIPES_INFRA_DIR to its checkout; see its README,"
+            ' section "Local dev environment".'
+        )
+    return script
+
+
+def _dev_stack(c: Context, arguments: str, **kwargs: Any) -> Result:
+    """Run dev-stack.sh from this worktree, the directory that identifies the stack."""
+    script = _dev_stack_script(c)
+    with c.cd(str(HERE)):
+        return _run(c, f"sh {shlex.quote(str(script))} {arguments}", **kwargs)
+
+
 @task(
     help={
         "label": "Test label(s) to run (default: all tests).",
         "verbosity": "Verbosity level: 0, 1, or 2 (default: 1).",
+        "postgres": "Run in the dev stack's container against Postgres, not SQLite.",
     }
 )
-def test(c: Context, label: str = "", verbosity: int = 1) -> None:
-    """Run the Django test suite inside the wagtail Docker Compose service."""
-    c.run(
-        f"docker compose exec wagtail uv run manage.py test {label} --verbosity={verbosity}",
-        pty=sys.stdout.isatty(),
-    )
+def test(
+    c: Context, label: str = "", verbosity: int = 1, postgres: bool = False
+) -> None:
+    """Run the Django test suite: on the host with SQLite, or --postgres in Docker."""
+    if postgres:
+        # run --build keeps the image in step with src/. The image bakes in dev
+        # settings (S3); test settings keep Postgres since POSTGRES_HOST is set.
+        _dev_stack(
+            c,
+            f"compose -f {COMPOSE_DEV} run --build --rm"
+            " -e DJANGO_SETTINGS_MODULE=recipe_cms.settings.test wagtail"
+            f" uv run manage.py test {label} --verbosity={verbosity}",
+            pty=sys.stdout.isatty(),
+        )
+        return
+    with c.cd("src"):
+        c.run(
+            f"uv run manage.py test {label} --verbosity={verbosity}",
+            pty=sys.stdout.isatty(),
+        )
 
 
 @task(help={"build": "Build images before running the development server."})
 def dev(c: Context, build: bool = False) -> None:
-    """Run the development server with docker compose."""
-    c.run(
-        f"docker compose up {'--build' if build else ''} --watch",
+    """Run the dev stack (recipes-infrastructure base + compose.dev.yml) with watch."""
+    _dev_stack(
+        c,
+        f"up --watch {'--build' if build else ''} --skip-lookup CMS_VERSION"
+        f" -f {COMPOSE_DEV}",
         pty=sys.stdout.isatty(),
     )
 
@@ -92,82 +149,4 @@ def dev(c: Context, build: bool = False) -> None:
 @task(help={"volumes": "Also remove volumes (resets database, static files, media)."})
 def down(c: Context, volumes: bool = False) -> None:
     """Stop and remove this directory's dev stack (stop `invoke dev` first)."""
-    c.run(f"docker compose down {'-v' if volumes else ''}", pty=sys.stdout.isatty())
-
-
-def _main_worktree(c: Context) -> Path:
-    out = _run(c, "git worktree list --porcelain", hide=True).stdout
-    return Path(out.splitlines()[0].removeprefix("worktree ")).resolve()
-
-
-@task(
-    help={
-        "port": "Host port for nginx (required, e.g. 8081).",
-        "db_port": "Host port for postgres (default: port - 8080 + 5432).",
-        "dev_server_port": (
-            "Frontend dev server port trusted besides 5173"
-            " (default: port - 8080 + 5173)."
-        ),
-        "name": "Compose project name (default: recipes-cms-<directory name>).",
-        "source": "Source .env (default: the main worktree's).",
-        "force": (
-            "Overwrite an existing .env (rebuilt from the source; edits are lost)."
-        ),
-    }
-)
-def worktree_env(  # noqa: PLR0913 -- parameters are invoke CLI flags
-    c: Context,
-    port: str | None = None,
-    db_port: str | None = None,
-    dev_server_port: str | None = None,
-    name: str | None = None,
-    source: str | None = None,
-    force: bool = False,
-) -> None:
-    """Write this worktree's .env with its own project name, ports and cookies."""
-    # invoke does not chdir to this file; tasks.py sits at the worktree root.
-    here = Path(__file__).resolve().parent
-    main = _main_worktree(c)
-    if here == main:
-        raise Exit("This is the main worktree; its .env is the source. Aborting.")
-    if port is None:
-        raise Exit("--port is required (e.g. --port 8081).")
-    try:
-        nginx_port = int(port)
-        derived = set()
-        postgres_port = (
-            int(db_port) if db_port is not None else default_postgres_port(nginx_port)
-        )
-        if db_port is None:
-            derived.add("--db-port")
-        frontend_port = (
-            int(dev_server_port)
-            if dev_server_port is not None
-            else default_dev_server_port(nginx_port)
-        )
-        if dev_server_port is None:
-            derived.add("--dev-server-port")
-        check_ports(nginx_port, postgres_port, frontend_port, derived)
-        project_name = sanitize_name(name) if name else default_project_name(here.name)
-    except ValueError as error:
-        raise Exit(str(error)) from error
-    source_path = Path(source) if source else main / ".env"
-    target = here / ".env"
-    if target.exists() and not force:
-        raise Exit(f"{target} exists; use --force to overwrite it.")
-    if not source_path.is_file():
-        raise Exit(f"Source {source_path} not found.")
-    target.write_text(
-        rewrite_env(
-            source_path.read_text(),
-            project_name,
-            nginx_port,
-            postgres_port,
-            frontend_port,
-        )
-    )
-    target.chmod(source_path.stat().st_mode & 0o777)
-    print(
-        f"Wrote {target} (project {project_name}, nginx :{nginx_port},"
-        f" postgres :{postgres_port}, dev server :{frontend_port})."
-    )
+    _dev_stack(c, f"down {'-v' if volumes else ''}", pty=sys.stdout.isatty())

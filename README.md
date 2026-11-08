@@ -145,68 +145,38 @@ Each entry groups the language versions of one recipe (max. 500 entries; a top-l
 - The upload is all-or-nothing: on any error nothing is written and the response is `400` with errors keyed by entry index and locale.
 - The response lists `created` and `updated` pages with `id`, `slug`, `locale`, `translation_key` and `live`.
 
-The same file can be imported from the command line (no permission checks; pages are published as requested):
+The same file can be imported from the command line (no permission checks; pages are published as requested; `DEV_STACK` is defined in "Running Management Commands"):
 
 ```bash
-docker compose exec wagtail uv run manage.py import_recipes recipes.json
+$DEV_STACK compose exec wagtail uv run manage.py import_recipes recipes.json
 ```
 
 ## Development
 
 ### Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/)
-- [Docker Compose](https://docs.docker.com/compose/install/) (included with Docker Desktop)
+- [Docker](https://docs.docker.com/get-docker/) with Docker Compose
+- [uv](https://docs.astral.sh/uv/) (Python 3.14+)
+- A clone of [recipes-infrastructure](https://github.com/globz-eu/recipes-infrastructure) next to this repository (siblings under one parent folder). It owns the local dev stack (Postgres, Garage S3, nginx, Wagtail and the recipes-frontend release); this repository only adds a backend override, [compose.dev.yml](compose.dev.yml), that builds this checkout instead of pulling the released image and syncs `src/` into the container. If the clone lives elsewhere, set `RECIPES_INFRA_DIR` to its path. In `.env` it only helps once `.env` exists, so use the shell for the first setup. The `invoke` tasks resolve the clone themselves (sibling of the main worktree, or `RECIPES_INFRA_DIR` from the shell or `.env`); raw `dev-stack.sh` commands below spell out the same rule, because `../recipes-infrastructure` does not resolve from a worktree under `recipes-cms-worktrees/<name>`. This requires recipes-infrastructure PR #22 (adds `scripts/dev-stack.sh` and `dev/compose.yml`), which is still open: until it is merged, `dev-stack.sh` exists only on its branch `feature/dev-environment`, so check that branch out, or `invoke dev`, `down` and `test --postgres` fail. No release tag exists yet; once PR #22 is merged use `main`, and replace it with the tag once one exists.
+
+```
+recipes/
+├── recipes-infrastructure/   # dev/compose.yml, scripts/dev-stack.sh
+├── recipes-cms/              # this repository
+└── recipes-frontend/         # only for `npm run dev`
+```
+
+Everything about the stack itself (config files, environment variables, versions, ports, nginx) is documented in the recipes-infrastructure README, section "Local dev environment"; it is not repeated here.
 
 ### Environment Variables
 
-Create a `.env` file in the project root with the following variables:
+In the main checkout, create `.env` in the project root from the recipes-infrastructure `dev/.env.example`:
 
 ```bash
-SECRET_KEY=your-django-secret-key
-# Optional: comma-separated previous keys, still accepted when verifying sessions and
-# signed values, so SECRET_KEY can be rotated without logging everyone out.
-# SECRET_KEY_FALLBACKS=old-key-1,old-key-2
-
-# Sign-in methods: comma-separated subset of local, auth0, zitadel (default local,auth0).
-# Each enabled provider's variables are required at startup; see "Authentication".
-AUTH_PROVIDERS=local,auth0
-
-# Auth0
-SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN=your-domain.auth0.com
-SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY=your-client-id
-SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET=your-client-secret
-AUTH0_ROLES_CLAIM=https://recipes.example/roles
-# A local dev Auth0 client needs its own post-login Action (the snippet in "Auth0 roles"
-# below) using the same claim name as AUTH0_ROLES_CLAIM, with roles assigned in that
-# tenant; the Pulumi-managed Action only affects the staging client.
-
-# Zitadel (only needed when AUTH_PROVIDERS contains zitadel)
-# SOCIAL_AUTH_ZITADEL_DOMAIN=your-instance.zitadel.cloud
-# SOCIAL_AUTH_ZITADEL_KEY=your-client-id
-# SOCIAL_AUTH_ZITADEL_SECRET=your-client-secret
-# Required with zitadel: only roles granted in this Zitadel organisation id are trusted
-# ZITADEL_ROLE_ORG_ID=your-org-id
-
-# PostgreSQL
-POSTGRES_USER=recipes
-POSTGRES_PASSWORD=recipes
-POSTGRES_DB=recipes
-POSTGRES_HOST=database
-
-# Garage S3-compatible object storage
-GARAGE_ADMIN_TOKEN=your-garage-admin-token
-GARAGE_METRICS_TOKEN=your-garage-metrics-token
-GARAGE_RPC_SECRET=your-garage-rpc-secret
-S3_BUCKET_NAME=recipes-cms
-S3_ACCESS_KEY=your-garage-access-key
-S3_SECRET_KEY=your-garage-secret-key
-S3_ENDPOINT_URL=http://s3:3900
-S3_URL_PROTOCOL=http:
-# S3_CUSTOM_DOMAIN and WAGTAILADMIN_BASE_URL are derived from NGINX_HOST_PORT in dev
+cp ../recipes-infrastructure/dev/.env.example .env && chmod 600 .env
 ```
 
-Copy `.env.example` to `.env` and fill in the values.
+(`dev-stack.sh env` is only for extra worktrees, see "Parallel stacks" below; in the main checkout it refuses without `--source` and rejects port 8080 as the main stack's.) Then fill in the secrets, the Auth0/Zitadel values and the `DJANGO_*` local users; `dev/.env.example` in recipes-infrastructure lists and explains every variable. `FRONTEND_VERSION` stays unset (the newest release is looked up) unless you pin it; `CMS_VERSION` is not looked up by `invoke dev`, which builds wagtail from source. `S3_CUSTOM_DOMAIN` and `WAGTAILADMIN_BASE_URL` are derived from `NGINX_HOST_PORT`; set them only to override. Production-only variables are in "Deployment".
 
 ### Starting the Stack
 
@@ -214,56 +184,38 @@ Copy `.env.example` to `.env` and fill in the values.
 uv run invoke dev
 ```
 
-This runs `docker compose up --watch` (use watch mode: only it syncs `src/` into the container). It starts these services:
+This runs `scripts/dev-stack.sh up --watch --skip-lookup CMS_VERSION -f compose.dev.yml` from this directory (use watch mode: only it syncs `src/` into the container). The services are `nginx` (the only published web port, `NGINX_HOST_PORT`, default 8080), `database` (PostgreSQL, `POSTGRES_HOST_PORT`, default 5432), `wagtail` (internal) and `s3` (Garage, internal). The admin interface is at http://localhost:8080/admin/ (or your `NGINX_HOST_PORT`). Reach the app through nginx.
 
-| Service    | Description                  | Host port (variable, default)       |
-|------------|------------------------------|-------------------------------------|
-| `nginx`    | Reverse proxy / static files | `NGINX_HOST_PORT`, 8080             |
-| `database` | PostgreSQL 18                | `POSTGRES_HOST_PORT`, 5432          |
-| `wagtail`  | Django/Wagtail app server    | internal (8000)                     |
-| `s3`       | Garage S3-compatible storage | internal (3900-3903)                |
-
-The admin interface is available at http://localhost:8080/admin/ (or the port you set in `NGINX_HOST_PORT`). Reach the app through nginx; wagtail and Garage are not published.
-
-`S3_CUSTOM_DOMAIN` (`localhost:<port>/media`) and `WAGTAILADMIN_BASE_URL` (`http://localhost:<port>`) are derived from `NGINX_HOST_PORT`; set them in `.env` only to override. nginx forwards the published port in `X-Forwarded-Host`, so Django builds URLs (CSRF origin, OAuth `redirect_uri`) for the right port.
+`up` is strict about versions: if the lookup of the newest `FRONTEND_VERSION` release fails it exits and names the variable to pin. The `wagtail` service in `compose.dev.yml` runs `migrate`, `ensure_users`, `collectstatic` and the development server; changes to `src/` are synced into the container without a restart.
 
 #### Parallel stacks (git worktrees)
 
-Each git worktree can run its own stack at the same time, as long as it has its own compose project name and host ports. In the worktree:
+A stack is identified by the directory it is started from: its `.env` holds the compose project name, ports and cookie names. In an extra worktree:
 
 ```bash
-uv run invoke worktree-env --port 8081   # [--db-port 5433] [--dev-server-port 5174] [--name <project>] [--source <.env>] [--force]
+"${RECIPES_INFRA_DIR:-<main checkout>/../recipes-infrastructure}"/scripts/dev-stack.sh env --port 8081   # [--db-port N] [--dev-server-port N] [--name NAME] [--source FILE] [--force]
 uv run invoke dev
 ```
 
-`worktree-env` copies the main worktree's `.env` (or `--source`) to the worktree and sets `COMPOSE_PROJECT_NAME` (default `recipes-cms-<directory name>`), `NGINX_HOST_PORT`, `POSTGRES_HOST_PORT` (default: port offset from 8080/5432, e.g. 8081 -> 5433), unique `SESSION_COOKIE_NAME` / `CSRF_COOKIE_NAME`, and `DEV_FRONTEND_ORIGINS` (`http://localhost:5173` plus the paired frontend dev server port, `5173 + (port - 8080)`, e.g. 8081 -> 5174; `--dev-server-port` overrides it). It drops `S3_CUSTOM_DOMAIN` and `WAGTAILADMIN_BASE_URL` so they follow the port again, refuses to run in the main worktree and refuses to overwrite an existing `.env` without `--force`. If you set up `.env` by hand, do the same: a copied `.env` with explicit `:8080` values keeps pointing at the other stack, and a duplicate project name silently shares containers and volumes.
+`env` copies the main worktree's `.env` (the default `--source`) and sets a unique project name, ports and cookie names, and the trusted frontend dev server origins (`DEV_FRONTEND_ORIGINS`, paired ports 8081 -> 5174). The port rules, the limits for social login and the frontend dev server (`RECIPES_CMS_PORT=8081 npm run dev` in recipes-frontend) are in the recipes-infrastructure README, "Parallel stacks (git worktrees)".
 
-- `uv run invoke test` works in each stack (each has its own database). Each stack has its own empty Garage, so uploads and browsing media both need the Garage provisioning below (worktree variant: import the copied keys).
-- Port pairs: extra stacks use nginx ports 8081-8089, each paired with a frontend dev server port (8081 -> 5174, ..., 8089 -> 5182); recipes-frontend and recipes-infrastructure use the same pairs. A `.env` written before `DEV_FRONTEND_ORIGINS` existed trusts only 5173: rerun `worktree-env --force` or add the line by hand.
-- Limits: social login (Auth0, and Zitadel once the dev stack enables it) works on nginx ports 8080-8089, which the recipes-infrastructure dev stack registers as callbacks; other ports need a `localExtraPorts` entry in recipes-infrastructure and `pulumi up --stack dev` there. Local/dev login works on any port. The frontend dev server follows the stack: run `RECIPES_CMS_PORT=8081 npm run dev` in recipes-frontend to proxy to the stack on 8081 and serve on its paired port (http://localhost:5174/frontend/), the origin the stack trusts; `DEV_SERVER_PORT` overrides the port and `RECIPES_CMS_URL` targets any other backend.
-- Cookies are scoped per host, not per port; the distinct cookie names keep the stacks' sessions apart in one browser.
-- Whoever starts a stack stops it, see "Stopping the Stack".
-
-### Live Reload (file sync)
-
-Use Docker Compose Watch to automatically sync local source changes into the container:
-
-```bash
-docker compose watch
-```
-
-Changes to `src/` are synced into the running container without requiring a restart. Changes to `config/nginx/nginx.conf.template` trigger an nginx restart.
+- Each stack has its own database and its own empty Garage, so uploads and browsing media need the Garage provisioning below.
+- **Whoever starts a stack stops it:** see "Stopping the Stack".
 
 ### Running Management Commands
 
+Run these through the stack's compose wrapper, from this directory:
+
 ```bash
+DEV_STACK="${RECIPES_INFRA_DIR:-<main checkout>/../recipes-infrastructure}"/scripts/dev-stack.sh
+
 # Open a shell inside the wagtail container
-docker compose exec wagtail /bin/bash
+$DEV_STACK compose exec wagtail /bin/bash
 
 # Or run a command directly
-docker compose exec wagtail uv run manage.py migrate
-docker compose exec wagtail uv run manage.py createsuperuser
-docker compose exec wagtail uv run manage.py collectstatic
+$DEV_STACK compose exec wagtail uv run manage.py migrate
+$DEV_STACK compose exec wagtail uv run manage.py createsuperuser
+$DEV_STACK compose exec wagtail uv run manage.py collectstatic
 ```
 
 #### Create or update an admin user
@@ -276,7 +228,7 @@ is read only from `DJANGO_ADMIN_PASSWORD`, so it never shows up in the process l
 shell history:
 
 ```bash
-docker compose exec -e DJANGO_ADMIN_PASSWORD='…' wagtail \
+$DEV_STACK compose exec -e DJANGO_ADMIN_PASSWORD='…' wagtail \
   uv run manage.py ensure_admin --username admin --email admin@example.com
 ```
 
@@ -285,15 +237,12 @@ password must pass Django's password validators.
 
 #### Local users and the frontend
 
-`docker compose up` runs `migrate` and then `ensure_users`, which creates or updates a
+The `wagtail` service runs `migrate` and then `ensure_users` on every start. It creates or updates a
 superuser, an Editors user and a Moderators user from `DJANGO_{ADMIN,EDITOR,MODERATOR}_{USERNAME,PASSWORD,EMAIL}`
-in `.env` (see `.env.example`). A role whose username and password are unset is skipped.
+in `.env` (see recipes-infrastructure `dev/.env.example`). A role whose username and password are unset is skipped.
 
-A one-shot `frontend` service downloads the latest [recipes-frontend](https://github.com/globz-eu/recipes-frontend)
-release into a volume that nginx serves at http://localhost:8080/frontend/. Set `FRONTEND_VERSION`
-(e.g. `v0.5.0`) to pin a release; to re-download after a new release, run
-`docker compose run --rm -e FRONTEND_FORCE=1 frontend` (or `docker compose up frontend` once the
-latest tag changes, since the installed tag is recorded in the volume).
+The stack serves the latest [recipes-frontend](https://github.com/globz-eu/recipes-frontend)
+release at http://localhost:8080/frontend/; `FRONTEND_VERSION` pins a release (see the recipes-infrastructure README).
 
 To work on the frontend against this backend, run `npm run dev` in `../recipes-frontend`
 (http://localhost:5173/frontend/). The dev server proxies to nginx, and its login prompt offers a
@@ -305,16 +254,15 @@ as `next` targets of login/logout redirects (`SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS
 
 ### Running Tests
 
+The default test run needs no Docker: it runs on the host against SQLite.
+
 ```bash
-# Run all tests
-docker compose exec wagtail uv run manage.py test
-
-# Run oidc_auth tests
-docker compose exec wagtail uv run manage.py test oidc_auth
-
-# Run home tests
-docker compose exec wagtail uv run manage.py test home
+uv run invoke test                      # all tests
+uv run invoke test --label=oidc_auth    # one app, module or test
+uv run invoke test --postgres           # in the dev stack's wagtail container, against Postgres
 ```
+
+`--postgres` builds the image from this checkout and runs the tests in a one-off `wagtail` container of the dev stack (it needs `.env` and the recipes-infrastructure clone, and uses the stack's database). Use it for changes that depend on Postgres behaviour. Changes touching email uniqueness (the `LOWER(email)` index, `oidc_auth` migration 0001, `enforce_email_ownership`, user forms) or other Postgres-specific behaviour must be verified with `uv run invoke test --postgres`, because no CI runs tests and the index test is skipped on SQLite.
 
 ### Invoke Tasks
 
@@ -322,12 +270,14 @@ Common development tasks are automated with [Invoke](https://www.pyinvoke.org/).
 
 | Task | Description |
 |------|-------------|
-| `invoke dev` | Start the development server via Docker Compose with file watching enabled (`--build` flag rebuilds images first) |
+| `invoke dev` | Start the dev stack (recipes-infrastructure base + `compose.dev.yml`) with file watching (`--build` rebuilds the image first) |
 | `invoke down` | Stop and remove this directory's stack (`--volumes` also removes volumes) |
-| `invoke worktree-env` | Write a worktree's `.env` with its own project name, ports, cookie names and dev server origins (`--port` required) |
+| `invoke test` | Run the tests on the host with SQLite (`--label`, `--verbosity`); `--postgres` runs them in the stack's container against Postgres |
 | `invoke format` | Format and auto-fix source code using `ruff` |
 | `invoke lint` | Check code without changing it: `ruff check`, `ruff format --check` and `mypy` (runs on the host) |
 | `invoke bump` | Bump the project version, update the lockfile, and create an annotated git tag (`--part major\|minor\|patch`, default: `patch`) |
+
+`dev`, `down` and `test --postgres` call `scripts/dev-stack.sh` of recipes-infrastructure (found as a sibling, or via `RECIPES_INFRA_DIR`). Any other compose command for the stack goes through `$DEV_STACK compose -f compose.dev.yml ARGS` (`DEV_STACK` as in "Running Management Commands").
 
 ```bash
 # Start dev server (rebuild images first)
@@ -346,13 +296,13 @@ Stop the `invoke dev` (watch) process first, then:
 
 ```bash
 # Stop containers
-uv run invoke down            # docker compose down
+uv run invoke down            # dev-stack.sh down
 
 # Stop and remove volumes (resets database and static files)
-uv run invoke down --volumes  # docker compose down -v
+uv run invoke down --volumes  # dev-stack.sh down -v
 ```
 
-Use `--volumes` before removing a throwaway worktree, or its volumes stay behind.
+Run `uv run invoke down --volumes` before deleting a throwaway worktree, or its volumes stay behind. `uv run invoke test --postgres` leaves the stack's database container running, so run `uv run invoke down` afterwards.
 
 ### Object Storage (Garage)
 
@@ -381,39 +331,21 @@ S3_URL_PROTOCOL=https:
 
 #### Provisioning Garage for a new environment
 
+Each stack starts with an empty Garage. Start the stack (`uv run invoke dev`, in another terminal), then provision it through `dev-stack.sh compose` (`DEV_STACK` as in "Running Management Commands"). The recipes-infrastructure README, "Local dev environment", has the same steps. Import the `S3_ACCESS_KEY` / `S3_SECRET_KEY` values from `.env` (the access key must be a Garage key id, i.e. start with `GK`), so `.env` stays valid; there is nothing to copy back:
+
 ```bash
-# 1. Start the stack (in another terminal)
-uv run invoke dev
-
-# 2. Apply layout (single-node cluster)
-docker compose exec s3 /garage layout assign -z dc1 -c 1G $(docker compose exec s3 /garage node id -q | head -c 16)
-docker compose exec s3 /garage layout apply --version 1
-
-# 3. Create bucket and access key
-docker compose exec s3 /garage bucket create recipes-cms
-docker compose exec s3 /garage key create recipes-cms-key
-docker compose exec s3 /garage bucket allow --read --write --owner recipes-cms --key recipes-cms-key
-
-# 4. Copy the printed key ID / secret into your .env as S3_ACCESS_KEY / S3_SECRET_KEY
+$DEV_STACK compose exec -T s3 /garage layout assign -z dc1 -c 1G "$($DEV_STACK compose exec -T s3 /garage node id -q | head -c 16)"
+$DEV_STACK compose exec -T s3 /garage layout apply --version 1
+$DEV_STACK compose exec -T s3 /garage bucket create recipes-cms
+$DEV_STACK compose exec -T s3 /garage key import --yes -n recipes-cms-key <S3_ACCESS_KEY> <S3_SECRET_KEY>
+$DEV_STACK compose exec -T s3 /garage bucket allow --read --write --owner recipes-cms --key recipes-cms-key
 ```
 
-In a worktree stack, start it with `uv run invoke dev` as in step 1, then provision Garage with the `S3_ACCESS_KEY` / `S3_SECRET_KEY` values from its `.env` (copied from the main stack) instead of `key create`, so `.env` stays valid, also after `worktree-env --force`. Replace the placeholders; there is nothing to copy into `.env`:
+If a key made with `key create` is in the way (its ID differs from `S3_ACCESS_KEY`), delete it first; this also drops its bucket grant. Restart `uv run invoke dev` afterwards if `.env` changed while the stack was running, so wagtail picks up the new keys.
 
 ```bash
-docker compose exec s3 /garage layout assign -z dc1 -c 1G $(docker compose exec s3 /garage node id -q | head -c 16)
-docker compose exec s3 /garage layout apply --version 1
-docker compose exec s3 /garage bucket create recipes-cms
-docker compose exec s3 /garage key import --yes -n recipes-cms-key <S3_ACCESS_KEY> <S3_SECRET_KEY>
-docker compose exec s3 /garage bucket allow --read --write --owner recipes-cms --key recipes-cms-key
-```
-
-A worktree provisioned earlier with `key create` can be repaired: delete the old key (this also drops its bucket grant), then import the keys from the `.env` that `worktree-env --force` rebuilt and grant them again. The old key is the one whose ID differs from `S3_ACCESS_KEY` (both may be named `recipes-cms-key`). If the stack was running when `.env` was rebuilt, restart `uv run invoke dev` afterwards so wagtail is recreated with the new keys.
-
-```bash
-docker compose exec s3 /garage key list
-docker compose exec s3 /garage key delete --yes <old key id>
-docker compose exec s3 /garage key import --yes -n recipes-cms-key <S3_ACCESS_KEY> <S3_SECRET_KEY>
-docker compose exec s3 /garage bucket allow --read --write --owner recipes-cms --key recipes-cms-key
+$DEV_STACK compose exec -T s3 /garage key list
+$DEV_STACK compose exec -T s3 /garage key delete --yes <old key id>
 ```
 
 #### Fix document ACLs
@@ -421,7 +353,7 @@ docker compose exec s3 /garage bucket allow --read --write --owner recipes-cms -
 If documents were uploaded before `wagtail-storages` was active, run:
 
 ```bash
-docker compose exec wagtail uv run manage.py fix_document_acls
+$DEV_STACK compose exec wagtail uv run manage.py fix_document_acls
 ```
 
 ## Deployment
@@ -447,6 +379,7 @@ extra variables:
 | `CORS_ALLOWED_ORIGINS` | Origins allowed to call the API with credentials (the frontend origin) |
 | `SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS` | Extra hosts login/logout may redirect back to (the frontend host) |
 | `STATIC_BUCKET_NAME`, `STATIC_CUSTOM_DOMAIN` | Collect static files to S3 and serve them from the CDN domain |
+| `SECRET_KEY_FALLBACKS` | Comma-separated previous `SECRET_KEY` values, so sessions and signed values survive a key rotation (optional) |
 | `S3_REGION_NAME` | Object storage region (`fr-par` on Scaleway, `garage` locally) |
 | `POSTGRES_SSLMODE` | libpq `sslmode` (`require` for Serverless SQL) |
 | `WAGTAILADMIN_BASE_URL` | Public base URL of the admin |
@@ -506,7 +439,7 @@ abort when the configured username belongs to a social user. Find duplicates
 (case-insensitive) with:
 
 ```bash
-docker compose exec wagtail uv run manage.py shell -c "from django.contrib.auth import get_user_model; from django.db.models import Count; from django.db.models.functions import Lower; print(list(get_user_model().objects.annotate(e=Lower('email')).exclude(e='').values('e').annotate(n=Count('id')).filter(n__gt=1)))"
+$DEV_STACK compose exec wagtail uv run manage.py shell -c "from django.contrib.auth import get_user_model; from django.db.models import Count; from django.db.models.functions import Lower; print(list(get_user_model().objects.annotate(e=Lower('email')).exclude(e='').values('e').annotate(n=Count('id')).filter(n__gt=1)))"
 ```
 
 It must print `[]`. Otherwise change the email of, or delete, all but one account per address in

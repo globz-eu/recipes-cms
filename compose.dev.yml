@@ -1,0 +1,26 @@
+# Backend override for the recipes-infrastructure dev stack (dev/compose.yml):
+# builds this checkout instead of pulling the released image and reloads on edits.
+# Start it with `uv run invoke dev`, which calls scripts/dev-stack.sh.
+services:
+  wagtail:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DJANGO_SETTINGS_MODULE: "recipe_cms.settings.dev"
+    # Never the registry name: a local build must not shadow a released image.
+    image: ${COMPOSE_PROJECT_NAME:?Start the stack with uv run invoke dev}-wagtail:dev
+    develop:
+      watch:
+        - action: sync
+          path: src
+          target: /app
+          initial_sync: true
+    command:
+      - sh
+      - -c
+      - >-
+        uv run manage.py migrate --noinput &&
+        uv run manage.py ensure_users &&
+        uv run manage.py collectstatic --noinput --clear &&
+        exec uv run manage.py runserver 0.0.0.0:8000

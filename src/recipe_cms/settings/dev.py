@@ -21,7 +21,7 @@ DEV_PASSWORD_LOGIN = True
 # Frontend dev servers (Vite) proxying to this backend. The proxy keeps the
 # browser's Origin (http://localhost:<vite port>) while nginx forwards the nginx
 # host, so Django sees a cross-origin request: trust each dev server origin.
-# One entry per dev server, comma-separated (`invoke worktree-env` sets it).
+# One entry per dev server, comma-separated (`dev-stack.sh env` sets it).
 CSRF_TRUSTED_ORIGINS = env_list(  # noqa: F405 -- settings extend base via star import
     "DEV_FRONTEND_ORIGINS", default=["http://localhost:5173"]
 )
