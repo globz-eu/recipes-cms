@@ -250,7 +250,7 @@ username/password form for the users above. That form posts to `/api/dev-login/`
 when `DEV_PASSWORD_LOGIN` is true (set in `recipe_cms.settings.dev` only; it is off in production)
 and is not part of the published frontend build. The dev settings trust the dev server origins in
 `DEV_FRONTEND_ORIGINS` (comma-separated, default `http://localhost:5173`) for CSRF and accept them
-as `next` targets of login/logout redirects (`SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS`).
+as `next` targets of login/logout redirects (`ALLOWED_REDIRECT_HOSTS`).
 
 ### Running Tests
 
@@ -377,7 +377,7 @@ extra variables:
 | `ALLOWED_HOSTS` | Comma-separated hosts, e.g. `staging.example.com` |
 | `CSRF_TRUSTED_ORIGINS` | Origins allowed to POST, e.g. `https://staging.example.com,https://static.staging.example.com` |
 | `CORS_ALLOWED_ORIGINS` | Origins allowed to call the API with credentials (the frontend origin) |
-| `SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS` | Extra hosts login/logout may redirect back to (the frontend host) |
+| `ALLOWED_REDIRECT_HOSTS` | Comma-separated extra hosts local/social login and logout may redirect back to via `next` (the frontend host) |
 | `STATIC_BUCKET_NAME`, `STATIC_CUSTOM_DOMAIN` | Collect static files to S3 and serve them from the CDN domain |
 | `SECRET_KEY_FALLBACKS` | Comma-separated previous `SECRET_KEY` values, so sessions and signed values survive a key rotation (optional) |
 | `S3_REGION_NAME` | Object storage region (`fr-par` on Scaleway, `garage` locally) |
@@ -423,7 +423,7 @@ token error) gives the generic `login_failed`. For an existing association the e
 provider reports at each login is checked; the stored email is never refreshed from the
 provider (social-auth protects `email`). A refused login redirects to the `next` URL
 given at login start (only allowed hosts: the request host and
-`SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS`) with `auth_error=<code>` appended, so the frontend
+`ALLOWED_REDIRECT_HOSTS`) with `auth_error=<code>` appended, so the frontend
 can show a message; without a safe `next` URL the user lands on the Wagtail login page
 with an error message.
 

@@ -14,7 +14,7 @@ def safe_redirect_url(request: HttpRequest, url: str | None) -> str | None:
     """
     Return ``url`` if it points to the request host or an allowed redirect host.
 
-    Allowed hosts are the request host plus SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS;
+    Allowed hosts are the request host plus ALLOWED_REDIRECT_HOSTS;
     HTTPS is required when the request itself is secure. Rejected URLs are
     logged and ``None`` is returned.
     """
@@ -22,7 +22,7 @@ def safe_redirect_url(request: HttpRequest, url: str | None) -> str | None:
         return None
     allowed_hosts = {
         request.get_host(),
-        *getattr(settings, "SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS", []),
+        *getattr(settings, "ALLOWED_REDIRECT_HOSTS", []),
     }
     if url_has_allowed_host_and_scheme(
         url, allowed_hosts=allowed_hosts, require_https=request.is_secure()

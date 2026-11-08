@@ -33,12 +33,12 @@ class DevFrontendOriginsTests(SimpleTestCase):
     def test_default_when_unset(self):
         dev = self.load_dev()
         self.assertEqual(dev.CSRF_TRUSTED_ORIGINS, ["http://localhost:5173"])
-        self.assertEqual(dev.SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS, ["localhost:5173"])
+        self.assertEqual(dev.ALLOWED_REDIRECT_HOSTS, ["localhost:5173"])
 
     def test_default_when_empty(self):
         dev = self.load_dev(DEV_FRONTEND_ORIGINS="")
         self.assertEqual(dev.CSRF_TRUSTED_ORIGINS, ["http://localhost:5173"])
-        self.assertEqual(dev.SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS, ["localhost:5173"])
+        self.assertEqual(dev.ALLOWED_REDIRECT_HOSTS, ["localhost:5173"])
 
     def test_read_from_env(self):
         dev = self.load_dev(
@@ -49,7 +49,7 @@ class DevFrontendOriginsTests(SimpleTestCase):
             ["http://localhost:5174", "http://localhost:5175"],
         )
         self.assertEqual(
-            dev.SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS,
+            dev.ALLOWED_REDIRECT_HOSTS,
             ["localhost:5174", "localhost:5175"],
         )
 
@@ -67,17 +67,44 @@ class ProductionIgnoresDevOriginsTests(SimpleTestCase):
         with _env(
             DEV_FRONTEND_ORIGINS="http://localhost:5174",
             CSRF_TRUSTED_ORIGINS="https://app.example.com",
-            SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS="",
+            ALLOWED_REDIRECT_HOSTS="app.example.com",
+            SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS="old.example.com",
         ):
             from recipe_cms.settings import production
 
             production = importlib.reload(production)
         self.assertEqual(production.CSRF_TRUSTED_ORIGINS, ["https://app.example.com"])
-        self.assertEqual(production.SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS, [])
+        self.assertEqual(production.ALLOWED_REDIRECT_HOSTS, ["app.example.com"])
+        self.assertFalse(hasattr(production, "SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS"))
+
+    def test_old_env_var_is_not_read(self):
+        with _env(SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS="old.example.com"):
+            from recipe_cms.settings import production
+
+            production = importlib.reload(production)
+        self.assertEqual(production.ALLOWED_REDIRECT_HOSTS, [])
+
+
+class DevHasNoOldRedirectSettingTests(SimpleTestCase):
+    def test_old_name_absent(self):
+        from recipe_cms.settings import dev
+
+        self.assertFalse(hasattr(dev, "SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS"))
+
+
+@override_settings(ALLOWED_REDIRECT_HOSTS=["app.example.com"])
+class SocialCoreReadsRedirectHostsTests(SimpleTestCase):
+    def test_strategy_setting_falls_back_to_bare_name(self):
+        from social_django.utils import load_strategy
+
+        strategy = load_strategy()
+        self.assertEqual(
+            strategy.setting("ALLOWED_REDIRECT_HOSTS"), ["app.example.com"]
+        )
 
 
 @override_settings(
-    SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["localhost:5173", "localhost:5174"],
+    ALLOWED_REDIRECT_HOSTS=["localhost:5173", "localhost:5174"],
     # AUTHENTICATION_BACKENDS is computed from AUTH_PROVIDERS at import, and
     # social_django resolves the backend from it: pin both, whatever the env.
     AUTHENTICATION_BACKENDS=[

@@ -8,7 +8,7 @@ from wagtail.documents import urls as wagtaildocs_urls
 
 from home.views import CsrfTokenView, DevLoginView, HomeViewSet
 from image_auth.views import serve_media
-from oidc_auth.views import AuthProvidersView, CustomLogoutView
+from oidc_auth.views import AuthProvidersView, CustomLogoutView, LocalLoginView
 from recipes.views import RecipeViewSet
 
 router = DefaultRouter()
@@ -16,7 +16,8 @@ router.register("home", HomeViewSet, basename="home")
 router.register("recipes", RecipeViewSet, basename="recipes")
 urlpatterns = [
     path("django-admin/", admin.site.urls),
-    # Override Wagtail admin logout before including wagtailadmin_urls
+    # Override Wagtail admin login and logout before including wagtailadmin_urls
+    path("admin/login/", LocalLoginView.as_view(), name="wagtailadmin_login"),
     path(
         "admin/logout/",
         CustomLogoutView.as_view(redirect_url="/admin/"),
