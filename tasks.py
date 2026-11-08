@@ -73,11 +73,12 @@ def lint(c: Context) -> None:
     }
 )
 def test(c: Context, label: str = "", verbosity: int = 1) -> None:
-    """Run the Django test suite inside the wagtail Docker Compose service."""
-    c.run(
-        f"docker compose exec wagtail uv run manage.py test {label} --verbosity={verbosity}",
-        pty=sys.stdout.isatty(),
-    )
+    """Run the Django test suite on the host with SQLite (settings.test)."""
+    with c.cd("src"):
+        c.run(
+            f"uv run manage.py test {label} --verbosity={verbosity}",
+            pty=sys.stdout.isatty(),
+        )
 
 
 @task(help={"build": "Build images before running the development server."})

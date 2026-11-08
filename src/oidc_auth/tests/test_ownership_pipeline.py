@@ -1,7 +1,8 @@
+from unittest import skipUnless
 from unittest.mock import Mock
 
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.test import TestCase
 from social_core.exceptions import AuthAlreadyAssociated
 from social_django.utils import load_strategy
@@ -164,6 +165,10 @@ class OwnershipLookupTestCase(TestCase):
 
         self.assertIsNone(email_owner(""))
 
+    @skipUnless(
+        connection.vendor == "postgresql",
+        "SQLite LOWER() is ASCII-only, so it cannot lowercase the KELVIN SIGN",
+    )
     def test_email_owner_compares_with_lower_like_the_index(self):
         user = User.objects.create_user(username="u", email="k@example.com")
 
