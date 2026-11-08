@@ -28,9 +28,7 @@ CSRF_TRUSTED_ORIGINS = env_list(  # noqa: F405 -- settings extend base via star 
 
 # Login/logout may redirect back to those dev servers (`next`); the hosts are
 # compared with their port.
-SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS = [
-    urlsplit(origin).netloc for origin in CSRF_TRUSTED_ORIGINS
-]
+ALLOWED_REDIRECT_HOSTS = [urlsplit(origin).netloc for origin in CSRF_TRUSTED_ORIGINS]
 
 # Distinct cookie names let several dev stacks share one browser (cookies are
 # scoped per host, not per port).

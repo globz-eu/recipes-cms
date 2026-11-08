@@ -24,7 +24,7 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
 # Hosts (besides the current one) that login/logout may redirect back to.
-SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS = env_list("SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS")
+ALLOWED_REDIRECT_HOSTS = env_list("ALLOWED_REDIRECT_HOSTS")
 SOCIAL_AUTH_REDIRECT_IS_HTTPS = True
 
 # ManifestStaticFilesStorage is recommended in production, to prevent

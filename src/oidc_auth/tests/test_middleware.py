@@ -18,7 +18,7 @@ from oidc_auth.exceptions import AlreadySignedIn, EmailOwnedElsewhere
 from oidc_auth.middleware import LOGIN_FAILED_MESSAGE, LoginRefusedMiddleware
 
 
-@override_settings(SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["app.example.com"])
+@override_settings(ALLOWED_REDIRECT_HOSTS=["app.example.com"])
 class LoginRefusedMiddlewareTestCase(TestCase):
     def setUp(self):
         self.middleware = LoginRefusedMiddleware(lambda request: HttpResponse())

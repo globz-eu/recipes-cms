@@ -180,7 +180,7 @@ class CustomLogoutViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], "/frontend/")
 
-    @override_settings(SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["static.example.com"])
+    @override_settings(ALLOWED_REDIRECT_HOSTS=["static.example.com"])
     @patch("oidc_auth.views.logout")
     def test_absolute_next_on_allowed_host_is_used(self, mock_logout):
         """An absolute ?next URL on an allowed redirect host is honoured."""
@@ -194,7 +194,7 @@ class CustomLogoutViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], next_url)
 
-    @override_settings(SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["static.example.com"])
+    @override_settings(ALLOWED_REDIRECT_HOSTS=["static.example.com"])
     @patch("oidc_auth.views.logout")
     def test_absolute_next_on_disallowed_host_is_ignored(self, mock_logout):
         """An absolute ?next URL on an unknown host falls back to the default."""
@@ -212,7 +212,7 @@ class CustomLogoutViewTestCase(TestCase):
     @override_settings(
         SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN="test-domain.auth0.com",
         SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY="test-client-id",
-        SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["static.example.com"],
+        ALLOWED_REDIRECT_HOSTS=["static.example.com"],
     )
     @patch("oidc_auth.views.logout")
     def test_auth0_logout_return_to_allowed_absolute_next(self, mock_logout):
@@ -244,7 +244,7 @@ class CustomLogoutViewTestCase(TestCase):
     SOCIAL_AUTH_ZITADEL_DOMAIN="zitadel.example.com",
     SOCIAL_AUTH_ZITADEL_KEY="zit-client",
     ZITADEL_ROLE_ORG_ID="org-1",
-    SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["static.example.com"],
+    ALLOWED_REDIRECT_HOSTS=["static.example.com"],
 )
 @override_settings(AUTH_PROVIDERS=["local", "auth0", "zitadel"])
 class ProviderLogoutTestCase(TestCase):

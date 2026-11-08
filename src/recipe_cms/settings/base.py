@@ -187,6 +187,11 @@ ROLE_GROUP_MAP = {"editor": "Editors", "moderator": "Moderators"}
 DEV_PASSWORD_LOGIN = False
 
 # Social auth pipeline - includes the step that syncs provider roles to groups
+# Hosts (besides the request host) that login/logout may redirect back to.
+# python-social-auth falls back to this bare name (social_core/strategy.py,
+# BaseStrategy.setting), so one setting serves both it and our redirect checks.
+ALLOWED_REDIRECT_HOSTS: list[str] = []
+
 SOCIAL_AUTH_PIPELINE = (
     # Get the information we can about the user and return it in a simple
     # format to create the user instance later. In some cases the details are
