@@ -4,7 +4,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from unittest import mock
+from unittest import SkipTest, mock
 
 from django.test import SimpleTestCase
 from invoke.context import Context
@@ -16,6 +16,9 @@ SRC = ROOT / "src"
 
 
 def load_tasks():
+    if not (ROOT / "tasks.py").is_file():
+        # The container image holds src/ only; these are host-side checks.
+        raise SkipTest("tasks.py is not available (running inside the image)")
     spec = importlib.util.spec_from_file_location("cms_tasks", ROOT / "tasks.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

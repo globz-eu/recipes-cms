@@ -49,15 +49,16 @@ class TestSettingsModuleTestCase(SimpleTestCase):
             and not k.startswith("SOCIAL_AUTH_")
             and k != "DJANGO_SETTINGS_MODULE"
         }
+        src = __import__("pathlib").Path(__file__).resolve().parents[2]
         code = (
-            "import sys, json; sys.path.insert(0, 'src');"
+            "import sys, json; sys.path.insert(0, {src!r});"
             "from recipe_cms.settings import test as s;"
             "print(json.dumps({'db': s.DATABASES['default'],"
             " 'key': s.SECRET_KEY, 'hashers': s.PASSWORD_HASHERS,"
             " 'storage': s.STORAGES['default']['BACKEND'],"
             " 'static': 'staticfiles' in s.STORAGES}))"
-        )
-        root = __import__("pathlib").Path(__file__).resolve().parents[3]
+        ).replace("{src!r}", repr(str(src)))
+        root = src
         out = subprocess.run(
             [sys.executable, "-c", code],
             env={**base, **env},
