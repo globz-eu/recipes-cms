@@ -10,7 +10,9 @@ SERVE_STATIC = False
 # SECURITY WARNING: define the correct hosts in production!
 ALLOWED_HOSTS = ["*"]
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+MAILERS = {
+    "default": {"BACKEND": "django.core.mail.backends.console.EmailBackend"},
+}
 
 BASE_PATH = os.getenv("BASE_PATH", "/")
 
