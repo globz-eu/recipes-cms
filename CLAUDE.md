@@ -17,7 +17,7 @@ The dev stack (Postgres, Garage S3, nginx, Wagtail, frontend release) is defined
 **One stack per git worktree, so branches can be tested in parallel.** In an extra worktree run `../recipes-infrastructure/scripts/dev-stack.sh env --port 8081` (writes its `.env` from the main worktree's with a unique project name, ports, cookie names and `DEV_FRONTEND_ORIGINS`; options and port rules are in the recipes-infrastructure README, "Parallel stacks (git worktrees)"), then `uv run invoke dev`. Only nginx and postgres are published; use `localhost:<NGINX_HOST_PORT>`. Each stack has an empty Garage: provision it via `dev-stack.sh compose` (README, "Provisioning Garage"). **Whoever starts a stack stops it:** stop the watch process, then `uv run invoke down` (`--volumes` for throwaway worktrees, before removing them).
 
 ```bash
-uv run invoke dev [--build]         # dev-stack.sh up --watch -f compose.dev.yml (src/ is synced)
+uv run invoke dev [--build]         # dev-stack.sh up --watch --skip-lookup CMS_VERSION -f compose.dev.yml (src/ is synced)
 uv run invoke down [--volumes]      # dev-stack.sh down [-v]
 uv run invoke test --label=recipes  # run tests on the host with SQLite (label optional); --postgres: in the container
 uv run invoke format                # ruff check --fix + ruff format on src and tasks.py

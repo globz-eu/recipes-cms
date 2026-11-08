@@ -176,7 +176,7 @@ Create `.env` in the project root with `dev-stack.sh env`, which starts from the
 ../recipes-infrastructure/scripts/dev-stack.sh env --port 8080
 ```
 
-(For an extra worktree see "Parallel stacks" below.) Then fill in the secrets, the Auth0/Zitadel values and the `DJANGO_*` local users; `dev/.env.example` in recipes-infrastructure lists and explains every variable. `CMS_VERSION` and `FRONTEND_VERSION` stay unset (the newest releases are looked up) unless you pin them. `S3_CUSTOM_DOMAIN` and `WAGTAILADMIN_BASE_URL` are derived from `NGINX_HOST_PORT`; set them only to override. Production-only variables are in "Deployment".
+(For an extra worktree see "Parallel stacks" below.) Then fill in the secrets, the Auth0/Zitadel values and the `DJANGO_*` local users; `dev/.env.example` in recipes-infrastructure lists and explains every variable. `FRONTEND_VERSION` stays unset (the newest release is looked up) unless you pin it; `CMS_VERSION` is not looked up by `invoke dev`, which builds wagtail from source. `S3_CUSTOM_DOMAIN` and `WAGTAILADMIN_BASE_URL` are derived from `NGINX_HOST_PORT`; set them only to override. Production-only variables are in "Deployment".
 
 ### Starting the Stack
 
@@ -184,9 +184,9 @@ Create `.env` in the project root with `dev-stack.sh env`, which starts from the
 uv run invoke dev
 ```
 
-This runs `scripts/dev-stack.sh up --watch -f compose.dev.yml` from this directory (use watch mode: only it syncs `src/` into the container). The services are `nginx` (the only published web port, `NGINX_HOST_PORT`, default 8080), `database` (PostgreSQL, `POSTGRES_HOST_PORT`, default 5432), `wagtail` (internal) and `s3` (Garage, internal). The admin interface is at http://localhost:8080/admin/ (or your `NGINX_HOST_PORT`). Reach the app through nginx.
+This runs `scripts/dev-stack.sh up --watch --skip-lookup CMS_VERSION -f compose.dev.yml` from this directory (use watch mode: only it syncs `src/` into the container). The services are `nginx` (the only published web port, `NGINX_HOST_PORT`, default 8080), `database` (PostgreSQL, `POSTGRES_HOST_PORT`, default 5432), `wagtail` (internal) and `s3` (Garage, internal). The admin interface is at http://localhost:8080/admin/ (or your `NGINX_HOST_PORT`). Reach the app through nginx.
 
-`up` is strict about versions: if the lookup of the newest release fails it exits and names the variable to pin. The `wagtail` service in `compose.dev.yml` runs `migrate`, `ensure_users`, `collectstatic` and the development server; changes to `src/` are synced into the container without a restart.
+`up` is strict about versions: if the lookup of the newest `FRONTEND_VERSION` release fails it exits and names the variable to pin. The `wagtail` service in `compose.dev.yml` runs `migrate`, `ensure_users`, `collectstatic` and the development server; changes to `src/` are synced into the container without a restart.
 
 #### Parallel stacks (git worktrees)
 

@@ -138,7 +138,8 @@ def dev(c: Context, build: bool = False) -> None:
     """Run the dev stack (recipes-infrastructure base + compose.dev.yml) with watch."""
     _dev_stack(
         c,
-        f"up --watch {'--build' if build else ''} -f {COMPOSE_DEV}",
+        f"up --watch {'--build' if build else ''} --skip-lookup CMS_VERSION"
+        f" -f {COMPOSE_DEV}",
         pty=sys.stdout.isatty(),
     )
 
