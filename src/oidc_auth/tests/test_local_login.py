@@ -1,8 +1,9 @@
 """Local login (`/admin/login/`) follows `next` to ALLOWED_REDIRECT_HOSTS."""
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import resolve, reverse
+from wagtail.admin.views.account import LoginView
 
 from oidc_auth.views import LocalLoginView
 
@@ -106,3 +107,22 @@ class LocalLoginRouteTests(TestCase):
             response, 'href="/login/auth0_openidconnect/?next=%2Fadmin%2Fpages%2F"'
         )
         self.assertContains(response, 'name="password"')
+
+
+@override_settings(ALLOWED_REDIRECT_HOSTS=["static.example.com"])
+class LocalLoginRootCauseTests(TestCase):
+    """Issue #35: Django's LoginView allows no host besides the request's."""
+
+    def hosts(self, view_class):
+        view = view_class()
+        view.setup(RequestFactory().get("/admin/login/", HTTP_HOST="cms.example.com"))
+        return view.get_success_url_allowed_hosts()
+
+    def test_stock_wagtail_view_only_allows_request_host(self):
+        self.assertEqual(LoginView.success_url_allowed_hosts, set())
+        self.assertEqual(self.hosts(LoginView), {"cms.example.com"})
+
+    def test_local_view_adds_allowed_redirect_hosts(self):
+        self.assertEqual(
+            self.hosts(LocalLoginView), {"cms.example.com", "static.example.com"}
+        )
