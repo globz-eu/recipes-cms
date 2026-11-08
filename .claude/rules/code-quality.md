@@ -15,8 +15,8 @@ Django/Wagtail-specific rules are in `backend.md`.
   extension points or abstractions "for later".
 - Don't add a dependency for something a few lines of code can do.
 - Prefer pure functions. Keep side effects (database, network, files, subprocesses, the clock) at
-  the edges: `home/worktree_env.py` holds pure helpers (`default_postgres_port`, `rewrite_env`),
-  `tasks.py` does the file and Docker work.
+  the edges: `tasks.py` keeps the subprocess and file work in small helpers (`_dev_stack`,
+  `_env_file_value`).
 - Don't reassign parameters. Return new values.
 
 ## DRY
