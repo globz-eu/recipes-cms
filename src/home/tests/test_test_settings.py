@@ -31,3 +31,66 @@ class TestDatabaseVendorTestCase(TestCase):
             self.assertEqual(connection.vendor, "sqlite")
         else:
             self.assertEqual(connection.vendor, "postgresql")
+
+
+class TestSettingsModuleTestCase(SimpleTestCase):
+    """Import recipe_cms.settings.test in a clean process with chosen env."""
+
+    def load(self, **env):
+        import json
+        import os
+        import subprocess
+        import sys
+
+        base = {
+            k: v
+            for k, v in os.environ.items()
+            if k not in {"POSTGRES_HOST", "SECRET_KEY", "AUTH_PROVIDERS"}
+            and not k.startswith("SOCIAL_AUTH_")
+            and k != "DJANGO_SETTINGS_MODULE"
+        }
+        code = (
+            "import sys, json; sys.path.insert(0, 'src');"
+            "from recipe_cms.settings import test as s;"
+            "print(json.dumps({'db': s.DATABASES['default'],"
+            " 'key': s.SECRET_KEY, 'hashers': s.PASSWORD_HASHERS,"
+            " 'storage': s.STORAGES['default']['BACKEND'],"
+            " 'static': 'staticfiles' in s.STORAGES}))"
+        )
+        root = __import__("pathlib").Path(__file__).resolve().parents[3]
+        out = subprocess.run(
+            [sys.executable, "-c", code],
+            env={**base, **env},
+            cwd=root,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(out.returncode, 0, out.stderr)
+        return json.loads(out.stdout)
+
+    def test_needs_no_environment_and_uses_sqlite_in_memory(self):
+        result = self.load()
+
+        self.assertEqual(result["db"]["ENGINE"], "django.db.backends.sqlite3")
+        self.assertEqual(result["db"]["NAME"], ":memory:")
+        self.assertEqual(result["key"], "test-only-secret-key")
+        self.assertTrue(result["static"])
+
+    def test_fast_password_hasher(self):
+        self.assertEqual(
+            self.load()["hashers"], ["django.contrib.auth.hashers.MD5PasswordHasher"]
+        )
+
+    def test_postgres_host_keeps_the_postgres_database(self):
+        result = self.load(POSTGRES_HOST="db")
+
+        self.assertEqual(result["db"]["ENGINE"], "django.db.backends.postgresql")
+        self.assertEqual(result["db"]["HOST"], "db")
+
+    def test_existing_secret_key_wins(self):
+        self.assertEqual(self.load(SECRET_KEY="given")["key"], "given")
+
+    def test_storage_is_in_memory(self):
+        self.assertEqual(
+            self.load()["storage"], "django.core.files.storage.InMemoryStorage"
+        )
