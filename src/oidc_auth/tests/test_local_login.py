@@ -126,3 +126,12 @@ class LocalLoginRootCauseTests(TestCase):
         self.assertEqual(
             self.hosts(LocalLoginView), {"cms.example.com", "static.example.com"}
         )
+
+    def test_local_view_accepts_request_argument(self):
+        request = RequestFactory().get("/admin/login/", HTTP_HOST="cms.example.com")
+        view = LocalLoginView()
+        view.setup(request)
+        self.assertEqual(
+            view.get_success_url_allowed_hosts(request),
+            {"cms.example.com", "static.example.com"},
+        )
