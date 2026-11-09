@@ -28,9 +28,11 @@ Spec: `docs/plans/2026-11-08-update-wagtail-8-1.spec.md`.
 
 1. Increment 1, baseline: on `main` run lint and both test suites; record failures.
 2. Branch `feature/update-wagtail-8-1`; run `uv lock --upgrade`; stop and report if a package blocks Wagtail 8.1 or Django 6.1.
+   - Cap `social-auth-app-django>=5.7,<6` (user decision; 6.x is already POST-only); social-auth 6+ migration is a follow-up issue.
 3. Increment 2: raise lower bounds in `pyproject.toml:8-23` to the locked versions, add `django>=6.1`; commit "Update dependencies".
 4. Increment 3: run `makemigrations --check`; commit any generated migrations.
-5. Replace `EMAIL_BACKEND` in `dev.py` with `MAILERS` only if `-Wd` flags it; then commit.
+5. Replace `EMAIL_BACKEND` in `dev.py` with `MAILERS` (flagged by `-Wd`); commit.
+   - Django 6.1: `LocalLoginView.get_success_url_allowed_hosts` takes `request`.
 6. Increment 4: fix new ruff/mypy findings without silencing them; commit format-only changes separately.
 7. Increment 5: update `README.md:61-62` versions and the Django comment in `base.py:4` only if misleading; commit "Update documented versions".
 

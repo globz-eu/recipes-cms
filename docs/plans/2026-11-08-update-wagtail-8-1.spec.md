@@ -15,8 +15,10 @@ Stay current; no new features.
 
 ## Non-goals
 
-- New Wagtail features (v3 API, custom base page models, `MAILERS`).
+- New Wagtail features (v3 API, custom base page models); `MAILERS` only replaces the deprecated `EMAIL_BACKEND`.
 - Python version change (stays 3.14).
+- social-auth-app-django 6+ (POST-only login start from 6.x): capped `<6`; follow-up issue (decided by user, 2026-11-09).
+  - Reason: 6 and 7 make login start POST-only with CSRF; admin, DRF and recipes-frontend use GET links.
 - Migrating off any API Wagtail only deprecates for later (e.g. v2 API, not used here).
 
 ## Findings so far
