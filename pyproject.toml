@@ -10,7 +10,7 @@ dependencies = [
     "django-storages[s3]>=1.14.6",
     "gunicorn>=26.2.0",
     "psycopg2-binary>=2.9.13",
-    "social-auth-app-django>=7.2.0",
+    "social-auth-app-django>=5.7,<6",
     "wagtail>=8.1",
     "wagtail-storages>=2.0",
 ]
