@@ -34,6 +34,13 @@ class WagtailLoginPageTests(TestCase):
             response, '<input type="hidden" name="next" value="/admin/pages/">'
         )
 
+    @override_settings(AUTH_PROVIDERS=["local", "auth0"])
+    def test_no_next_input_without_next(self):
+        response = self.get()
+        self.assertContains(response, 'action="/login/auth0_openidconnect/"')
+        social_form = response.content.decode().split("</form>")[0]
+        self.assertNotIn('name="next"', social_form)
+
     @override_settings(AUTH_PROVIDERS=["local"])
     def test_local_only_has_no_provider_buttons(self):
         response = self.get()

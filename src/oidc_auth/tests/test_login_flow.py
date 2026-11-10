@@ -302,6 +302,32 @@ class LoginFlowTestCase(TestCase):
         self.assertContains(page, escape(OrgMismatch.message))
         self.assertFalse(User.objects.exists())
 
+    def test_refusal_after_login_page_without_next_shows_message_there(self):
+        client = Client(enforce_csrf_checks=True)
+        page = client.get(reverse("wagtailadmin_login")).content.decode()
+        form = page.split("</form>")[0]
+        token = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', form)
+        self.assertIsNotNone(token)
+        config = {"authorization_endpoint": "https://zitadel.example.com/authorize"}
+        with patch.object(ZitadelOpenIdConnect, "oidc_config", lambda self: config):
+            client.post("/login/zitadel/", {"csrfmiddlewaretoken": token.group(1)})
+        self.client = client
+
+        response = self.complete(
+            {
+                "sub": "uid-1",
+                "email": EMAIL,
+                "email_verified": True,
+                OWNER_CLAIM: "org-2",
+            },
+            next_url=None,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith(reverse("wagtailadmin_login")))
+        page = self.client.get(response["Location"])
+        self.assertContains(page, escape(OrgMismatch.message))
+
     def test_existing_linked_user_now_owned_by_another_org_is_refused(self):
         user = User.objects.create_user("known", email=EMAIL)
         UserSocialAuth.objects.create(
