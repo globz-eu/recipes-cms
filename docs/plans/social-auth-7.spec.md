@@ -47,7 +47,7 @@ Companion spec (frontend POST form, merged first): recipes-frontend `docs/plans/
 ### Done when
 
 - `uv run invoke lint`, `uv run invoke test`, `uv run invoke test --postgres` pass.
-- Manual sign-in via Wagtail admin with a social provider works on the dev stack.
+- Manual sign-in via Wagtail admin with a social provider on the dev stack: WAIVED. No interactive provider sign-in is possible in the agent environment, so the dev stack check reached the provider redirect only; the callback is covered by the mocked harness in `oidc_auth/tests`. A real Zitadel/Auth0 sign-in, ideally with a pre-upgrade 5.9.0 row, remains for the maintainer before release.
 - PR says `Closes #39`; it merges after the recipes-frontend PR.
 
 ### Left to the builder

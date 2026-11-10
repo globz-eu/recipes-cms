@@ -117,7 +117,8 @@ Spec: `docs/plans/social-auth-7.spec.md` (user-approved). Frontend half: recipes
 - `uv run invoke test --postgres` after increments 3 and 4 (email race, backfill on Postgres).
 - In the worktree: `$DEV_STACK env --port 8081`, then `uv run invoke dev --build`.
 - Run `migrate`; sign in at `localhost:8081/admin/login/` with Zitadel (or Auth0); check `GET /login/zitadel/` is 405.
-- With a pre-existing row from a 5.9.0 stack if available: same user after sign-in.
+  Agent check reached the provider redirect only; real sign-in waived in the spec (maintainer to do before release).
+- With a pre-existing row from a 5.9.0 stack if available: same user after sign-in (waived with the above; maintainer to do).
 - Stop watch, then `uv run invoke down --volumes`.
 
 ## Risks
