@@ -5,6 +5,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import resolve, reverse
 from wagtail.admin.views.account import LoginView
 
+from oidc_auth.config import AUTH0, SOCIAL_BACKENDS
 from oidc_auth.views import LocalLoginView
 
 User = get_user_model()
@@ -85,7 +86,7 @@ class LocalLoginRedirectTests(TestCase):
 
 @override_settings(
     AUTHENTICATION_BACKENDS=[
-        "social_core.backends.auth0_openidconnect.Auth0OpenIdConnectAuth",
+        SOCIAL_BACKENDS[AUTH0],
         "django.contrib.auth.backends.ModelBackend",
     ],
     AUTH_PROVIDERS=["local", "auth0"],
