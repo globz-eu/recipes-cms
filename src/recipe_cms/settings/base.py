@@ -173,6 +173,9 @@ SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SCOPE = ["openid", "profile", "email", "offline_
 SOCIAL_AUTH_ZITADEL_DOMAIN = os.getenv("SOCIAL_AUTH_ZITADEL_DOMAIN", None)
 SOCIAL_AUTH_ZITADEL_KEY = os.getenv("SOCIAL_AUTH_ZITADEL_KEY", None)
 SOCIAL_AUTH_ZITADEL_SECRET = os.getenv("SOCIAL_AUTH_ZITADEL_SECRET", None)
+# social_django's id_key backfill (migration 0020) only knows built-in backends;
+# Zitadel rows stored before social-auth-core 6 are keyed by the OIDC "sub".
+SOCIAL_AUTH_OLD_ID_KEYS = {"zitadel": "sub"}
 # Required with zitadel: only Zitadel roles granted in this organisation count.
 ZITADEL_ROLE_ORG_ID = os.getenv("ZITADEL_ROLE_ORG_ID", "").strip()
 
