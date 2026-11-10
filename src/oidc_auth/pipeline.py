@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured
+from django.db import IntegrityError
 from social_core.backends.base import BaseAuth
-from social_core.exceptions import AuthAlreadyAssociated
 from social_core.pipeline.user import create_user as social_create_user
 from social_core.strategy import BaseStrategy
 
@@ -112,8 +112,8 @@ def create_user(
 
     ``enforce_email_ownership`` checks before the insert; two simultaneous first
     logins with the same email can both pass it. The unique index on the email
-    (migration ``oidc_auth.0001``) then rejects the second insert, which
-    social_django reports as ``AuthAlreadyAssociated``.
+    (migration ``oidc_auth.0001``) then rejects the second insert. social_django
+    does not recognise that index and lets the ``IntegrityError`` through.
     """
     try:
         return social_create_user(
@@ -124,7 +124,7 @@ def create_user(
             *args,
             **kwargs,
         )
-    except AuthAlreadyAssociated as error:
+    except IntegrityError as error:
         if email_owner(details.get("email") or "") is not None:
             raise EmailOwnedElsewhere(backend) from error
         raise

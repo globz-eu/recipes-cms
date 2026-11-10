@@ -4,7 +4,7 @@ from unittest.mock import Mock
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, connection, transaction
 from django.test import TestCase
-from social_core.exceptions import AuthAlreadyAssociated
+from social_core.exceptions import AuthAssociationError
 from social_django.utils import load_strategy
 
 from oidc_auth.backends import ZitadelOpenIdConnect
@@ -218,5 +218,7 @@ class CreateUserTestCase(TestCase):
     def test_other_integrity_errors_are_not_reported_as_email_in_use(self):
         User.objects.create_user(username="taken", email="other@example.com")
 
-        with self.assertRaises(AuthAlreadyAssociated):
+        with self.assertRaises(AuthAssociationError) as raised:
             self.create("taken", EMAIL)
+
+        self.assertEqual(raised.exception.code, "username_in_use")
