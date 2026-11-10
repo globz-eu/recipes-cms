@@ -7,6 +7,7 @@ from django.conf import settings
 from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 
+from oidc_auth.config import AUTH0, SOCIAL_BACKENDS
 from oidc_auth.redirects import safe_redirect_url
 
 
@@ -108,7 +109,7 @@ class SocialCoreReadsRedirectHostsTests(SimpleTestCase):
     # AUTHENTICATION_BACKENDS is computed from AUTH_PROVIDERS at import, and
     # social_django resolves the backend from it: pin both, whatever the env.
     AUTHENTICATION_BACKENDS=[
-        "social_core.backends.auth0_openidconnect.Auth0OpenIdConnectAuth",
+        SOCIAL_BACKENDS[AUTH0],
         "django.contrib.auth.backends.ModelBackend",
     ],
     AUTH_PROVIDERS=["local", "auth0"],

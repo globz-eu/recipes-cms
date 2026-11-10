@@ -10,7 +10,7 @@ from oidc_auth.config import (
     parse_auth_providers,
 )
 
-AUTH0_BACKEND = "social_core.backends.auth0_openidconnect.Auth0OpenIdConnectAuth"
+AUTH0_BACKEND = "oidc_auth.backends.Auth0OpenIdConnect"
 ZITADEL_BACKEND = "oidc_auth.backends.ZitadelOpenIdConnect"
 MODEL_BACKEND = "django.contrib.auth.backends.ModelBackend"
 PERMISSIONS_BACKEND = "oidc_auth.backends.PermissionsOnlyBackend"

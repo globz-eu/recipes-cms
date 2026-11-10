@@ -7,9 +7,12 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.utils.html import escape
+from django.utils.module_loading import import_string
+from social_core.backends.open_id_connect import OpenIdConnectAuth
 from social_django.models import UserSocialAuth
 
 from oidc_auth.backends import ZitadelOpenIdConnect
+from oidc_auth.config import AUTH0, SOCIAL_BACKENDS
 from oidc_auth.exceptions import OrgMismatch
 
 User = get_user_model()
@@ -17,6 +20,39 @@ User = get_user_model()
 EMAIL = "person@example.com"
 NEXT = "/frontend/"
 OWNER_CLAIM = "urn:zitadel:iam:user:resourceowner:id"
+AUTH0_DOMAIN = "auth0.example.com"
+
+
+@override_settings(
+    AUTHENTICATION_BACKENDS=[
+        SOCIAL_BACKENDS[AUTH0],
+        "django.contrib.auth.backends.ModelBackend",
+    ],
+    AUTH_PROVIDERS=["local", "auth0"],
+    SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN=AUTH0_DOMAIN,
+    SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY="key",
+    SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET="secret",
+)
+class Auth0LoginStartTests(TestCase):
+    def setUp(self):
+        OpenIdConnectAuth.oidc_config.invalidate()
+        self.addCleanup(OpenIdConnectAuth.oidc_config.invalidate)
+
+    def test_login_redirects_to_the_discovered_authorize_endpoint(self):
+        config = {"authorization_endpoint": f"https://{AUTH0_DOMAIN}/authorize"}
+        backend_class = import_string(SOCIAL_BACKENDS[AUTH0])
+        with patch.object(backend_class, "get_json", return_value=config) as get_json:
+            response = self.client.get("/login/auth0_openidconnect/")
+
+        get_json.assert_called_once_with(
+            f"https://{AUTH0_DOMAIN}/.well-known/openid-configuration"
+        )
+        self.assertEqual(response.status_code, 302)
+        location = urlsplit(response["Location"])
+        self.assertEqual(
+            f"{location.scheme}://{location.netloc}{location.path}",
+            config["authorization_endpoint"],
+        )
 
 
 @override_settings(

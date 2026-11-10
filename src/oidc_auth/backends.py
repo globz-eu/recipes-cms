@@ -5,6 +5,7 @@ from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpRequest
+from social_core.backends.auth0_openidconnect import Auth0OpenIdConnectAuth
 from social_core.backends.open_id_connect import OpenIdConnectAuth
 
 ZITADEL_ORG_SCOPE_PREFIX = "urn:zitadel:iam:org:id:"
@@ -23,6 +24,18 @@ class PermissionsOnlyBackend(ModelBackend):
         **kwargs: Any,
     ) -> User | None:
         return None
+
+
+class Auth0OpenIdConnect(Auth0OpenIdConnectAuth):
+    """Auth0 sign-in whose discovery URL has no double slash.
+
+    Upstream ``oidc_endpoint`` ends in a slash and ``oidc_config`` appends
+    ``/.well-known/openid-configuration``; Auth0 answers the resulting ``//``
+    URL with 404. The backend name, and so every URL, stays upstream's.
+    """
+
+    def oidc_endpoint(self) -> str:
+        return f"https://{self.setting('DOMAIN')}"
 
 
 class ZitadelOpenIdConnect(OpenIdConnectAuth):
