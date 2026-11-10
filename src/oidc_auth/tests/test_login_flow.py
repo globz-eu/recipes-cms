@@ -306,11 +306,11 @@ class LoginFlowTestCase(TestCase):
         client = Client(enforce_csrf_checks=True)
         page = client.get(reverse("wagtailadmin_login")).content.decode()
         form = page.split("</form>")[0]
-        token = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', form)
-        self.assertIsNotNone(token)
+        fields = dict(re.findall(r'name="([^"]+)" value="([^"]*)"', form))
+        self.assertIn("csrfmiddlewaretoken", fields)
         config = {"authorization_endpoint": "https://zitadel.example.com/authorize"}
         with patch.object(ZitadelOpenIdConnect, "oidc_config", lambda self: config):
-            client.post("/login/zitadel/", {"csrfmiddlewaretoken": token.group(1)})
+            client.post("/login/zitadel/", fields)
         self.client = client
 
         response = self.complete(
