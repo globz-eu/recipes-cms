@@ -42,7 +42,7 @@ class Auth0LoginStartTests(TestCase):
         config = {"authorization_endpoint": f"https://{AUTH0_DOMAIN}/authorize"}
         backend_class = import_string(SOCIAL_BACKENDS[AUTH0])
         with patch.object(backend_class, "get_json", return_value=config) as get_json:
-            response = self.client.get("/login/auth0_openidconnect/")
+            response = self.client.post("/login/auth0_openidconnect/")
 
         get_json.assert_called_once_with(
             f"https://{AUTH0_DOMAIN}/.well-known/openid-configuration"
@@ -95,7 +95,7 @@ class LoginFlowTestCase(TestCase):
     def test_login_requests_the_org_and_resource_owner_scopes(self):
         config = {"authorization_endpoint": "https://zitadel.example.com/authorize"}
         with patch.object(ZitadelOpenIdConnect, "oidc_config", lambda self: config):
-            response = self.client.get("/login/zitadel/")
+            response = self.client.post("/login/zitadel/")
 
         self.assertEqual(response.status_code, 302)
         location = urlsplit(response["Location"])

@@ -144,7 +144,7 @@ class DevServerRedirectTests(TestCase):
         with mock.patch(
             "social_core.backends.base.BaseAuth.start", return_value=started
         ) as start:
-            response = self.client.get(
+            response = self.client.post(
                 "/login/auth0_openidconnect/",
                 {"next": next_url},
                 HTTP_HOST="localhost:8081",
