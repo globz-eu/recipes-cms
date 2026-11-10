@@ -12,7 +12,7 @@
             {% for p in social_auth_providers %}
             <form method="post" action="{% url 'social:begin' p.backend_name %}">
               {% csrf_token %}
-              <input type="hidden" name="next" value="{{ next }}" />
+              {% if next %}<input type="hidden" name="next" value="{{ next }}" />{% endif %}
               <button type="submit" class="btn btn-primary form-control"
                       style="display: block; margin-bottom: 10px;">
                 Sign in with {{ p.label }}
