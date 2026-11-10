@@ -227,10 +227,12 @@ class LoginFlowTestCase(TestCase):
         self.assertFalse(UserSocialAuth.objects.exists())
 
     def test_identity_owned_by_another_user_is_refused_by_social_user(self):
-        # The refusal is social_core's AuthAlreadyAssociated from social_user,
-        # mapped to already_signed_in by the middleware (not the ownership step).
+        # The refusal is social_core's AuthAssociationError (identity_in_use) from
+        # social_user, mapped to already_signed_in by the middleware.
         owner = User.objects.create_user("owner", email=EMAIL)
-        UserSocialAuth.objects.create(user=owner, provider="zitadel", uid="uid-1")
+        UserSocialAuth.objects.create(
+            user=owner, provider="zitadel", uid="uid-1", id_key="sub"
+        )
         self.client.force_login(User.objects.create_user("other", email="o@x.com"))
 
         response = self.complete(
@@ -264,7 +266,9 @@ class LoginFlowTestCase(TestCase):
 
     def test_existing_linked_user_now_owned_by_another_org_is_refused(self):
         user = User.objects.create_user("known", email=EMAIL)
-        UserSocialAuth.objects.create(user=user, provider="zitadel", uid="uid-1")
+        UserSocialAuth.objects.create(
+            user=user, provider="zitadel", uid="uid-1", id_key="sub"
+        )
 
         response = self.complete(
             {

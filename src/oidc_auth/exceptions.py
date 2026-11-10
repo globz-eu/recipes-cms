@@ -1,9 +1,9 @@
 """Exceptions that refuse a social login with a user-facing message."""
 
-from social_core.exceptions import AuthException
+from social_core.exceptions import AuthPolicyError
 
 
-class LoginRefused(AuthException):
+class LoginRefused(AuthPolicyError):
     """A social login refused by our own rules; handled by LoginRefusedMiddleware."""
 
     auth_error: str = "login_refused"

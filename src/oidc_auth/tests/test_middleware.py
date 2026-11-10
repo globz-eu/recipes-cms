@@ -7,11 +7,11 @@ from django.http import HttpResponse
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from social_core.exceptions import (
-    AuthAlreadyAssociated,
+    AuthAssociationError,
     AuthCanceled,
-    AuthForbidden,
-    AuthStateMissing,
-    AuthTokenError,
+    AuthCredentialError,
+    AuthPolicyError,
+    AuthSessionError,
 )
 
 from oidc_auth.exceptions import AlreadySignedIn, EmailOwnedElsewhere
@@ -112,26 +112,26 @@ class LoginRefusedMiddlewareTestCase(TestCase):
         request = self.make_request(next_url)
         return request, self.middleware.process_exception(request, exception)
 
-    def test_already_associated_maps_to_already_signed_in(self):
+    def test_identity_in_use_maps_to_already_signed_in(self):
         backend = Mock()
         backend.name = "zitadel"
 
-        request, response = self.handle(AuthAlreadyAssociated(backend))
+        request, response = self.handle(AuthAssociationError(backend))
 
         self.assertEqual(
             response["Location"], "/frontend/?auth_error=already_signed_in"
         )
 
-    def test_already_associated_message_on_admin_login_fallback(self):
-        request, response = self.handle(AuthAlreadyAssociated(Mock()), next_url=None)
+    def test_identity_in_use_message_on_admin_login_fallback(self):
+        request, response = self.handle(AuthAssociationError(Mock()), next_url=None)
 
         self.assertEqual(response["Location"], reverse("wagtailadmin_login"))
         self.assertEqual(
             [m.message for m in get_messages(request)], [AlreadySignedIn.message]
         )
 
-    def test_canceled_and_forbidden_map_to_login_failed(self):
-        for exception in (AuthCanceled(Mock()), AuthForbidden(Mock())):
+    def test_canceled_and_policy_errors_map_to_login_failed(self):
+        for exception in (AuthCanceled(Mock()), AuthPolicyError(Mock())):
             with self.subTest(exception=type(exception).__name__):
                 request, response = self.handle(exception)
 
@@ -140,7 +140,7 @@ class LoginRefusedMiddlewareTestCase(TestCase):
                 )
 
     def test_other_auth_exceptions_map_to_login_failed(self):
-        for exception in (AuthStateMissing(Mock()), AuthTokenError(Mock())):
+        for exception in (AuthSessionError(Mock()), AuthCredentialError(Mock())):
             with self.subTest(exception=type(exception).__name__):
                 request, response = self.handle(exception)
 
@@ -151,7 +151,7 @@ class LoginRefusedMiddlewareTestCase(TestCase):
     def test_generic_auth_exception_is_logged_as_warning_with_details(self):
         backend = Mock()
         backend.name = "zitadel"
-        exception = AuthTokenError(backend, "invalid_client")
+        exception = AuthCredentialError(backend, "invalid_client")
 
         with self.assertLogs("oidc_auth.middleware", level="INFO") as logs:
             self.handle(exception)
@@ -160,9 +160,18 @@ class LoginRefusedMiddlewareTestCase(TestCase):
         message = logs.records[0].getMessage()
         self.assertIn("zitadel", message)
         self.assertIn("login_failed", message)
-        self.assertIn("AuthTokenError", message)
+        self.assertIn("AuthCredentialError", message)
         self.assertIn("invalid_client", message)
         self.assertIs(logs.records[0].exc_info[1], exception)
+
+    def test_other_association_conflicts_map_to_login_failed(self):
+        for code in ("identifier_migration_conflict", "username_in_use"):
+            with self.subTest(code=code):
+                request, response = self.handle(AuthAssociationError(Mock(), code=code))
+
+                self.assertEqual(
+                    response["Location"], "/frontend/?auth_error=login_failed"
+                )
 
     def test_login_failed_message_on_admin_login_fallback(self):
         request, response = self.handle(AuthCanceled(Mock()), next_url=None)
