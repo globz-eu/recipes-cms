@@ -14,7 +14,7 @@ AUTH0 = "auth0"
 ZITADEL = "zitadel"
 
 SOCIAL_BACKENDS: dict[str, str] = {
-    AUTH0: "social_core.backends.auth0_openidconnect.Auth0OpenIdConnectAuth",
+    AUTH0: "oidc_auth.backends.Auth0OpenIdConnect",
     ZITADEL: "oidc_auth.backends.ZitadelOpenIdConnect",
 }
 

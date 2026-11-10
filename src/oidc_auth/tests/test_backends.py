@@ -1,9 +1,15 @@
+from unittest.mock import patch
+
 from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase, override_settings
+from django.utils.module_loading import import_string
+from social_core.backends.open_id_connect import OpenIdConnectAuth
 from social_django.utils import load_strategy
 
 from oidc_auth.backends import ZitadelOpenIdConnect
+from oidc_auth.config import AUTH0, SOCIAL_BACKENDS
 
+AUTH0_DOMAIN = "example.eu.auth0.com"
 ORG_SCOPE = "urn:zitadel:iam:org:id:123456"
 OWNER_SCOPE = "urn:zitadel:iam:user:resourceowner"
 
@@ -64,3 +70,30 @@ class ZitadelOpenIdConnectTests(SimpleTestCase):
     def test_blank_org_id_fails_loudly(self):
         with self.assertRaises(ImproperlyConfigured):
             self.backend().get_scope()
+
+
+@override_settings(SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN=AUTH0_DOMAIN)
+class Auth0OpenIdConnectTests(SimpleTestCase):
+    """The configured Auth0 backend, as social_django loads it."""
+
+    def setUp(self):
+        OpenIdConnectAuth.oidc_config.invalidate()
+        self.addCleanup(OpenIdConnectAuth.oidc_config.invalidate)
+
+    def backend(self):
+        return import_string(SOCIAL_BACKENDS[AUTH0])(load_strategy())
+
+    def test_name_is_upstream_name(self):
+        self.assertEqual(self.backend().name, "auth0_openidconnect")
+
+    def test_oidc_endpoint_has_no_trailing_slash(self):
+        self.assertEqual(self.backend().oidc_endpoint(), f"https://{AUTH0_DOMAIN}")
+
+    def test_discovery_url_has_no_double_slash(self):
+        backend = self.backend()
+        with patch.object(type(backend), "get_json", return_value={}) as get_json:
+            backend.oidc_config()
+
+        get_json.assert_called_once_with(
+            f"https://{AUTH0_DOMAIN}/.well-known/openid-configuration"
+        )
