@@ -64,7 +64,7 @@ class EnforceEmailOwnershipTestCase(TestCase):
         with self.assertRaises(EmailMissing) as ctx:
             self.enforce(email="")
 
-        self.assertEqual(ctx.exception.code, "email_missing")
+        self.assertEqual(ctx.exception.auth_error, "email_missing")
 
     def test_signed_in_user_with_unverified_email_gets_already_signed_in(self):
         user = User.objects.create_user(username="local", email="me@example.com")
@@ -132,7 +132,7 @@ class EnforceEmailOwnershipTestCase(TestCase):
         with self.assertRaises(AlreadySignedIn) as ctx:
             self.enforce(user=user, social=None)
 
-        self.assertEqual(ctx.exception.code, "already_signed_in")
+        self.assertEqual(ctx.exception.auth_error, "already_signed_in")
         self.assertEqual(
             str(ctx.exception),
             "You are already signed in. Sign out first to use a different "
@@ -145,7 +145,7 @@ class EnforceEmailOwnershipTestCase(TestCase):
         with self.assertRaises(EmailOwnedElsewhere) as ctx:
             self.enforce()
 
-        self.assertEqual(ctx.exception.code, "email_in_use")
+        self.assertEqual(ctx.exception.auth_error, "email_in_use")
         self.assertEqual(str(ctx.exception), EmailOwnedElsewhere.message)
 
 

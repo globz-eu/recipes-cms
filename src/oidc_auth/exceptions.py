@@ -6,7 +6,7 @@ from social_core.exceptions import AuthException
 class LoginRefused(AuthException):
     """A social login refused by our own rules; handled by LoginRefusedMiddleware."""
 
-    code: str = "login_refused"
+    auth_error: str = "login_refused"
     message: str = "Sign-in was refused."
 
     def __str__(self) -> str:
@@ -14,17 +14,17 @@ class LoginRefused(AuthException):
 
 
 class EmailMissing(LoginRefused):
-    code = "email_missing"
+    auth_error = "email_missing"
     message = "Your sign-in provider did not share an email address."
 
 
 class EmailNotVerified(LoginRefused):
-    code = "email_unverified"
+    auth_error = "email_unverified"
     message = "Your email address is not verified with this sign-in provider."
 
 
 class EmailOwnedElsewhere(LoginRefused):
-    code = "email_in_use"
+    auth_error = "email_in_use"
     message = (
         "This email address is already used by another sign-in method. "
         "Sign in the way you did before, or ask an administrator."
@@ -32,12 +32,12 @@ class EmailOwnedElsewhere(LoginRefused):
 
 
 class AlreadySignedIn(LoginRefused):
-    code = "already_signed_in"
+    auth_error = "already_signed_in"
     message = (
         "You are already signed in. Sign out first to use a different sign-in method."
     )
 
 
 class OrgMismatch(LoginRefused):
-    code = "org_mismatch"
+    auth_error = "org_mismatch"
     message = "This account does not belong to this site's sign-in organisation."

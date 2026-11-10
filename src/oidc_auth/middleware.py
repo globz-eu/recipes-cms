@@ -25,9 +25,9 @@ LOGIN_FAILED_MESSAGE = "Sign-in failed. Please try again."
 def _refusal(exception: Exception) -> tuple[str, str] | None:
     """Return (code, message) for exceptions that end a social login, else None."""
     if isinstance(exception, LoginRefused):
-        return exception.code, exception.message
+        return exception.auth_error, exception.message
     if isinstance(exception, AuthAlreadyAssociated):
-        return AlreadySignedIn.code, AlreadySignedIn.message
+        return AlreadySignedIn.auth_error, AlreadySignedIn.message
     if isinstance(exception, AuthException):
         return LOGIN_FAILED_CODE, LOGIN_FAILED_MESSAGE
     return None
