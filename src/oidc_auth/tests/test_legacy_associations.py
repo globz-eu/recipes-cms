@@ -107,6 +107,25 @@ class ZitadelLegacyAssociationTests(LegacyAssociationAssertions):
         self.assert_refused(response, "login_failed")
         self.assertEqual(UserSocialAuth.objects.get().id_key, "")
 
+    def test_legacy_row_without_stored_id_is_refused(self):
+        # No evidence for the uid: core refuses rather than trusting it blindly.
+        extra_data = zitadel_extra_data(ZITADEL_UID)
+        del extra_data["id"]
+        self.legacy_row("zitadel", ZITADEL_UID, extra_data)
+
+        response = self.complete(ZITADEL_UID)
+
+        self.assert_refused(response, "login_failed")
+        self.assertEqual(UserSocialAuth.objects.get().id_key, "")
+
+    def test_other_identity_with_the_same_email_is_refused(self):
+        self.legacy_row("zitadel", "other-subject", zitadel_extra_data("other-subject"))
+
+        response = self.complete(ZITADEL_UID)
+
+        self.assert_refused(response, "email_in_use")
+        self.assertEqual(UserSocialAuth.objects.get().uid, "other-subject")
+
 
 @override_settings(
     AUTHENTICATION_BACKENDS=[
