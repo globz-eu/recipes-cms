@@ -5,7 +5,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
 from django.utils.html import escape
 from django.utils.module_loading import import_string
 from social_core.backends.open_id_connect import OpenIdConnectAuth
@@ -108,6 +108,18 @@ class LoginFlowTestCase(TestCase):
         scope = parse_qs(location.query)["scope"][0].split(" ")
         self.assertIn("urn:zitadel:iam:org:id:org-1", scope)
         self.assertIn("urn:zitadel:iam:user:resourceowner", scope)
+
+    def test_login_start_rejects_get(self):
+        response = self.client.get("/login/zitadel/")
+
+        self.assertEqual(response.status_code, 405)
+
+    def test_login_start_requires_a_csrf_token(self):
+        client = Client(enforce_csrf_checks=True)
+
+        response = client.post("/login/zitadel/", {"next": NEXT})
+
+        self.assertEqual(response.status_code, 403)
 
     def test_email_owned_by_another_user_is_refused_before_creating_anything(self):
         User.objects.create_user("local", email=EMAIL, password="x")
