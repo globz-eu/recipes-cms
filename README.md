@@ -12,7 +12,7 @@ Sign-in methods are pluggable. `AUTH_PROVIDERS` is a comma-separated subset of `
 stops the app at startup with an `ImproperlyConfigured` error naming every missing variable;
 disabled providers need none.
 
-- **Providers**: Auth0 and Zitadel via OpenID Connect (social-auth), plus local Django accounts. The Wagtail login page and the DRF login page show a button per enabled provider. `GET /api/auth/providers/` returns the enabled methods (`id`, `label`, `login_url`) so the frontend can render its own buttons; `login_url` is a POST target (see "Authentication Flow").
+- **Providers**: Auth0 and Zitadel via OpenID Connect (social-auth), plus local Django accounts. The Wagtail login page and the DRF login page show a button per enabled provider. `GET /api/auth/providers/` returns the enabled methods (`id`, `label`, `login_url`) so the frontend can render its own buttons; `login_url` is a POST target for the social providers (see "Authentication Flow") and the `/admin/login/` page (GET) for `local`.
 - **One email, one provider**: a social login is refused, never merged, when the provider does not report `email_verified: true`, or when the email already belongs to a local user, to a user linked to another provider, or to another user of the same provider (compared case-insensitively). A user who is already logged in cannot link a second provider either. A unique database index on the lower-cased email (blank emails excepted, migration `oidc_auth.0001`) enforces this even for simultaneous first logins; the login that loses the race is refused as `email_in_use`.
 - **Role sync**: on every login the user's provider roles are mapped to Wagtail groups (`ROLE_GROUP_MAP`: `editor` → Editors, `moderator` → Moderators); the `admin` role grants superuser and staff. Users without a role have no access. Roles are read from the ID token (falling back to the userinfo response): a list under `AUTH0_ROLES_CLAIM` for Auth0, the keys of the `urn:zitadel:iam:org:project:roles` object for Zitadel, counting only roles granted in the organisation `ZITADEL_ROLE_ORG_ID`.
 - **Logout**: the custom logout view logs out of Django and then of the user's own provider (Auth0 `/v2/logout`, Zitadel `/oidc/v1/end_session`); local users get a plain Django logout.
@@ -398,7 +398,7 @@ repository secret `E2E_DISPATCH_TOKEN` (fine-grained PAT, contents write on reci
 
 ## Authentication Flow
 
-1. User navigates to `/admin/` and picks an enabled sign-in method (or the frontend starts the login with a POST to a `login_url` from `/api/auth/providers/`, sending `csrfmiddlewaretoken` (from `/api/csrf/`) and `next` as form fields; a GET returns 405)
+1. User navigates to `/admin/` and picks an enabled sign-in method (or the frontend starts the login with a POST to a `login_url` from `/api/auth/providers/`, sending `csrfmiddlewaretoken` (from `/api/csrf/`) and `next` as form fields; a GET returns 405; the `local` entry's `login_url` is the `/admin/login/` page, opened with a GET)
 2. Social login: the user authenticates at Auth0 or Zitadel and returns to `/complete/<backend>/`. The social auth pipeline then:
    - For Zitadel, refuses the login unless the user belongs to the organisation `ZITADEL_ROLE_ORG_ID` (`org_mismatch`)
    - Refuses the login unless the provider reports a verified email that belongs to no other account (see below)
@@ -444,15 +444,15 @@ abort when the configured username belongs to a social user. Find duplicates
 $DEV_STACK compose exec wagtail uv run manage.py shell -c "from django.contrib.auth import get_user_model; from django.db.models import Count; from django.db.models.functions import Lower; print(list(get_user_model().objects.annotate(e=Lower('email')).exclude(e='').values('e').annotate(n=Count('id')).filter(n__gt=1)))"
 ```
 
-The social-auth 7 upgrade runs `social_django` migrations that only go forward (including an
-`id_key` backfill for existing associations; `SOCIAL_AUTH_OLD_ID_KEYS` covers Zitadel). To roll
-back to social-auth 5.x, first migrate `social_django` back with its reverse migrations, then
-deploy the older image.
-
 It must print `[]`. Otherwise change the email of, or delete, all but one account per address in
 the Wagtail admin of the running (old) version, or in the Django shell. The local
 `DJANGO_*_EMAIL` values must differ from each other and from every other user's email, or the
 dev stack won't start.
+
+The social-auth 7 upgrade runs `social_django` migrations including `0020_backfill_id_keys`
+(`SOCIAL_AUTH_OLD_ID_KEYS` covers Zitadel), whose reverse is a no-op. To roll back to
+social-auth 5.x, first run `migrate social_django 0017` with the new image (0017 is the last
+migration of social-auth-app-django 5.9.0), then deploy the old image.
 
 The frontend gets relative `login_url`s from `/api/auth/providers/`; because it is cross-origin
 in production it prefixes them with the API origin (it already does, via `apiUrl()`). It starts the login with a form POST to that URL carrying `csrfmiddlewaretoken` (from `/api/csrf/`) and `next`.
