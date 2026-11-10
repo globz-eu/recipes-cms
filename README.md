@@ -398,7 +398,7 @@ repository secret `E2E_DISPATCH_TOKEN` (fine-grained PAT, contents write on reci
 
 ## Authentication Flow
 
-1. User navigates to `/admin/` and picks an enabled sign-in method (or the frontend starts the login with a POST to a `login_url` from `/api/auth/providers/`, sending `csrfmiddlewaretoken` (from `/api/csrf/`) and `next` as form fields; a GET returns 405 once social-auth 6+ is installed)
+1. User navigates to `/admin/` and picks an enabled sign-in method (or the frontend starts the login with a POST to a `login_url` from `/api/auth/providers/`, sending `csrfmiddlewaretoken` (from `/api/csrf/`) and `next` as form fields; a GET returns 405)
 2. Social login: the user authenticates at Auth0 or Zitadel and returns to `/complete/<backend>/`. The social auth pipeline then:
    - For Zitadel, refuses the login unless the user belongs to the organisation `ZITADEL_ROLE_ORG_ID` (`org_mismatch`)
    - Refuses the login unless the provider reports a verified email that belongs to no other account (see below)
@@ -443,6 +443,11 @@ abort when the configured username belongs to a social user. Find duplicates
 ```bash
 $DEV_STACK compose exec wagtail uv run manage.py shell -c "from django.contrib.auth import get_user_model; from django.db.models import Count; from django.db.models.functions import Lower; print(list(get_user_model().objects.annotate(e=Lower('email')).exclude(e='').values('e').annotate(n=Count('id')).filter(n__gt=1)))"
 ```
+
+The social-auth 7 upgrade runs `social_django` migrations that only go forward (including an
+`id_key` backfill for existing associations; `SOCIAL_AUTH_OLD_ID_KEYS` covers Zitadel). To roll
+back to social-auth 5.x, first migrate `social_django` back with its reverse migrations, then
+deploy the older image.
 
 It must print `[]`. Otherwise change the email of, or delete, all but one account per address in
 the Wagtail admin of the running (old) version, or in the Django shell. The local
