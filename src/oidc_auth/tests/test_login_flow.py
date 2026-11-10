@@ -299,3 +299,13 @@ class LoginFlowTestCase(TestCase):
             pipeline.index(step),
             pipeline.index("social_core.pipeline.social_auth.social_user"),
         )
+
+    def test_social_names_runs_right_after_social_details(self):
+        pipeline = list(settings.SOCIAL_AUTH_PIPELINE)
+        step = "social_core.pipeline.social_auth.social_names"
+
+        self.assertEqual(pipeline.count(step), 1)
+        self.assertEqual(
+            pipeline.index(step),
+            pipeline.index("social_core.pipeline.social_auth.social_details") + 1,
+        )
