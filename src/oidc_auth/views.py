@@ -83,9 +83,11 @@ class LocalLoginView(LoginView):
     request refuses a plain-HTTP `next`.
     """
 
-    def get_success_url_allowed_hosts(self) -> set[str]:
+    def get_success_url_allowed_hosts(
+        self, request: HttpRequest | None = None
+    ) -> set[str]:
         # Read per request (not a class attribute) so settings changes apply.
-        return super().get_success_url_allowed_hosts() | set(
+        return super().get_success_url_allowed_hosts(request) | set(
             settings.ALLOWED_REDIRECT_HOSTS
         )
 

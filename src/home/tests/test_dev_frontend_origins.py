@@ -162,3 +162,16 @@ class DevServerRedirectTests(TestCase):
         # social-core replaces a refused `next` with LOGIN_REDIRECT_URL.
         _, stored = self.begin_login("http://localhost:5199/frontend/")
         self.assertEqual(stored, settings.LOGIN_REDIRECT_URL)
+
+
+class DevMailersTests(SimpleTestCase):
+    """dev.py configures the console mailer through MAILERS (not EMAIL_BACKEND)."""
+
+    def test_default_mailer_is_console_backend(self):
+        from recipe_cms.settings import dev
+
+        self.assertEqual(
+            dev.MAILERS,
+            {"default": {"BACKEND": "django.core.mail.backends.console.EmailBackend"}},
+        )
+        self.assertFalse(hasattr(dev, "EMAIL_BACKEND"))
