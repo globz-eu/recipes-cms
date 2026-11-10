@@ -77,8 +77,8 @@ class Auth0OpenIdConnectTests(SimpleTestCase):
     """The configured Auth0 backend, as social_django loads it."""
 
     def setUp(self):
-        OpenIdConnectAuth.oidc_config.invalidate()
-        self.addCleanup(OpenIdConnectAuth.oidc_config.invalidate)
+        OpenIdConnectAuth.get_openid_configuration.invalidate()
+        self.addCleanup(OpenIdConnectAuth.get_openid_configuration.invalidate)
 
     def backend(self):
         return import_string(SOCIAL_BACKENDS[AUTH0])(load_strategy())
@@ -94,6 +94,8 @@ class Auth0OpenIdConnectTests(SimpleTestCase):
         with patch.object(type(backend), "get_json", return_value={}) as get_json:
             backend.oidc_config()
 
-        get_json.assert_called_once_with(
-            f"https://{AUTH0_DOMAIN}/.well-known/openid-configuration"
+        get_json.assert_called_once()
+        self.assertEqual(
+            get_json.call_args.args,
+            (f"https://{AUTH0_DOMAIN}/.well-known/openid-configuration",),
         )

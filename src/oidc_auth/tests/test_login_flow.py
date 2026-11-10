@@ -35,8 +35,8 @@ AUTH0_DOMAIN = "auth0.example.com"
 )
 class Auth0LoginStartTests(TestCase):
     def setUp(self):
-        OpenIdConnectAuth.oidc_config.invalidate()
-        self.addCleanup(OpenIdConnectAuth.oidc_config.invalidate)
+        OpenIdConnectAuth.get_openid_configuration.invalidate()
+        self.addCleanup(OpenIdConnectAuth.get_openid_configuration.invalidate)
 
     def test_login_redirects_to_the_discovered_authorize_endpoint(self):
         config = {"authorization_endpoint": f"https://{AUTH0_DOMAIN}/authorize"}
@@ -44,8 +44,10 @@ class Auth0LoginStartTests(TestCase):
         with patch.object(backend_class, "get_json", return_value=config) as get_json:
             response = self.client.post("/login/auth0_openidconnect/")
 
-        get_json.assert_called_once_with(
-            f"https://{AUTH0_DOMAIN}/.well-known/openid-configuration"
+        get_json.assert_called_once()
+        self.assertEqual(
+            get_json.call_args.args,
+            (f"https://{AUTH0_DOMAIN}/.well-known/openid-configuration",),
         )
         self.assertEqual(response.status_code, 302)
         location = urlsplit(response["Location"])
