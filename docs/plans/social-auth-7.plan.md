@@ -44,7 +44,7 @@ Spec: `docs/plans/social-auth-7.spec.md` (user-approved). Frontend half: recipes
 1. `pyproject.toml` requires `social-auth-app-django>=7.2,<8`; `uv.lock` has core 6.2.x.
 2. `GET /login/zitadel/` returns 405; POST without CSRF token returns 403.
 3. POST with token and `next` starts the login and stores the sanitised `next`.
-4. Wagtail and DRF login pages render one POST form per provider with `csrfmiddlewaretoken` and `next`.
+4. Wagtail and DRF login pages render one POST form per provider with `csrfmiddlewaretoken` and `next` (only when `next` is set).
 5. `GET /api/auth/providers/` response is unchanged.
 6. Every existing `auth_error` code still results from the same scenarios (`test_login_flow`, `test_middleware`).
 7. A pre-upgrade Auth0 row (`id_key=""`, `extra_data.id == uid`) logs in as the same user; row gets `id_key="sub"`.
@@ -57,7 +57,7 @@ Spec: `docs/plans/social-auth-7.spec.md` (user-approved). Frontend half: recipes
 
 ## Design
 
-- Templates: replace `<a href>` with `<form method="post" action="{% url 'social:begin' ... %}">`, `{% csrf_token %}`, hidden `next`, `<button>`.
+- Templates: replace `<a href>` with `<form method="post" action="{% url 'social:begin' ... %}">`, `{% csrf_token %}`, hidden `next` (only when `next` is set), `<button>`.
 - Wagtail `above_login` sits before Wagtail's `<form>` (Wagtail 8.1 `wagtailadmin/login.html`), so no nested forms.
 - Keep classes: `button` (Wagtail), `btn btn-primary form-control` (DRF).
 - `oidc_auth/exceptions.py`: rename class attribute `code` to `auth_error`; base `LoginRefused` on `AuthPolicyError`.
@@ -75,7 +75,7 @@ Spec: `docs/plans/social-auth-7.spec.md` (user-approved). Frontend half: recipes
 
 1. `oidc_auth/templates/wagtailadmin/login.html:5`: POST form per provider.
 2. `oidc_auth/templates/rest_framework/login.html:13`: POST form per provider, same look.
-3. Tests `oidc_auth/tests/test_login_pages.py`, `test_local_login.py:107`: assert `action=`, `method="post"`, `csrfmiddlewaretoken`, `next` value.
+3. Tests `oidc_auth/tests/test_login_pages.py`, `test_local_login.py:107`: assert `action=`, `method="post"`, `csrfmiddlewaretoken`, `next` value (and its absence without `next`).
 4. `oidc_auth/tests/test_login_flow.py:62` and `home/tests/test_dev_frontend_origins.py:146`: start logins with `client.post`.
 5. `README.md:104,401,452`: `login_url` is a POST target needing `csrfmiddlewaretoken` (from `/api/csrf/`).
 
