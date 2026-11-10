@@ -1,11 +1,13 @@
 """Social login through the real URL, pipeline and LoginRefusedMiddleware."""
 
+import re
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, override_settings
+from django.urls import reverse
 from django.utils.html import escape
 from django.utils.module_loading import import_string
 from social_core.backends.open_id_connect import OpenIdConnectAuth
@@ -104,6 +106,46 @@ class LoginFlowTestCase(TestCase):
         response = client.post("/login/zitadel/", {"next": NEXT})
 
         self.assertEqual(response.status_code, 403)
+
+    def start_from_login_page(self, page_url, next_url):
+        """POST a login page's Zitadel form with its CSRF token, as a browser does."""
+        client = Client(enforce_csrf_checks=True)
+        page = client.get(page_url, {"next": next_url})
+        token = re.search(
+            r'name="csrfmiddlewaretoken" value="([^"]+)"', page.content.decode()
+        )
+        self.assertIsNotNone(token)
+        config = {"authorization_endpoint": "https://zitadel.example.com/authorize"}
+        with patch.object(ZitadelOpenIdConnect, "oidc_config", lambda self: config):
+            response = client.post(
+                "/login/zitadel/",
+                {"csrfmiddlewaretoken": token.group(1), "next": next_url},
+            )
+        return client, response
+
+    def test_login_page_form_starts_the_login_with_its_csrf_token(self):
+        for page_url, next_url in (
+            (reverse("wagtailadmin_login"), "/admin/pages/"),
+            (reverse("rest_framework:login"), "/api/"),
+        ):
+            with self.subTest(page=page_url):
+                client, response = self.start_from_login_page(page_url, next_url)
+
+                self.assertEqual(response.status_code, 302)
+                location = urlsplit(response["Location"])
+                self.assertEqual(
+                    f"{location.scheme}://{location.netloc}{location.path}",
+                    "https://zitadel.example.com/authorize",
+                )
+                self.assertEqual(client.session["next"], next_url)
+
+    def test_login_start_drops_an_untrusted_next(self):
+        client, response = self.start_from_login_page(
+            reverse("wagtailadmin_login"), "https://evil.example.org/"
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(client.session["next"], settings.LOGIN_REDIRECT_URL)
 
     def test_email_owned_by_another_user_is_refused_before_creating_anything(self):
         User.objects.create_user("local", email=EMAIL, password="x")
