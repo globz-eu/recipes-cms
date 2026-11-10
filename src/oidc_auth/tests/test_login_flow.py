@@ -14,11 +14,11 @@ from social_django.models import UserSocialAuth
 from oidc_auth.backends import ZitadelOpenIdConnect
 from oidc_auth.config import AUTH0, SOCIAL_BACKENDS
 from oidc_auth.exceptions import OrgMismatch
+from oidc_auth.tests.login_harness import NEXT, complete_login
 
 User = get_user_model()
 
 EMAIL = "person@example.com"
-NEXT = "/frontend/"
 OWNER_CLAIM = "urn:zitadel:iam:user:resourceowner:id"
 AUTH0_DOMAIN = "auth0.example.com"
 
@@ -69,8 +69,6 @@ class Auth0LoginStartTests(TestCase):
     ZITADEL_ROLE_ORG_ID="org-1",
 )
 class LoginFlowTestCase(TestCase):
-    url = "/complete/zitadel/"
-
     def complete(self, claims, next_url=NEXT):
         """Complete a Zitadel login of a user of org-1; a ``None`` claim is left out."""
         claims = {
@@ -78,21 +76,7 @@ class LoginFlowTestCase(TestCase):
             for key, value in {OWNER_CLAIM: "org-1", **claims}.items()
             if value is not None
         }
-        session = self.client.session
-        if next_url:
-            session["next"] = next_url
-        session.save()
-
-        def auth_complete(backend, *args, **kwargs):
-            return backend.do_auth("access-token", *args, **kwargs)
-
-        with (
-            patch.object(ZitadelOpenIdConnect, "auth_complete", auth_complete),
-            patch.object(
-                ZitadelOpenIdConnect, "user_data", lambda *a, **k: dict(claims)
-            ),
-        ):
-            return self.client.get(self.url)
+        return complete_login(self.client, ZitadelOpenIdConnect, claims, next_url)
 
     def test_login_requests_the_org_and_resource_owner_scopes(self):
         config = {"authorization_endpoint": "https://zitadel.example.com/authorize"}
