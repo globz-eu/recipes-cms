@@ -2,7 +2,11 @@
 {% block branding_login %}Sign in to Recipes CMS{% endblock %}
 {% block above_login %}
 {% for p in social_auth_providers %}
-<p><a class="button" href="{% url 'social:begin' p.backend_name %}{% if next %}?next={{ next|urlencode:"" }}{% endif %}">Sign in with {{ p.label }}</a></p>
+<form method="post" action="{% url 'social:begin' p.backend_name %}">
+{% csrf_token %}
+{% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+<p><button type="submit" class="button">Sign in with {{ p.label }}</button></p>
+</form>
 {% endfor %}
 {% endblock %}
 {% block login_form %}{% if local_login_enabled %}{{ block.super }}{% endif %}{% endblock %}

@@ -27,15 +27,7 @@ class PermissionsOnlyBackend(ModelBackend):
 
 
 class Auth0OpenIdConnect(Auth0OpenIdConnectAuth):
-    """Auth0 sign-in whose discovery URL has no double slash.
-
-    Upstream ``oidc_endpoint`` ends in a slash and ``oidc_config`` appends
-    ``/.well-known/openid-configuration``; Auth0 answers the resulting ``//``
-    URL with 404. The backend name, and so every URL, stays upstream's.
-    """
-
-    def oidc_endpoint(self) -> str:
-        return f"https://{self.setting('DOMAIN')}"
+    """Auth0 sign-in under the upstream backend name, so every URL stays upstream's."""
 
 
 class ZitadelOpenIdConnect(OpenIdConnectAuth):

@@ -104,8 +104,9 @@ class LocalLoginRouteTests(TestCase):
     def test_login_page_keeps_template_and_social_buttons(self):
         response = self.client.get("/admin/login/", {"next": "/admin/pages/"})
         self.assertTemplateUsed(response, "wagtailadmin/login.html")
+        self.assertContains(response, 'action="/login/auth0_openidconnect/"')
         self.assertContains(
-            response, 'href="/login/auth0_openidconnect/?next=%2Fadmin%2Fpages%2F"'
+            response, '<input type="hidden" name="next" value="/admin/pages/">'
         )
         self.assertContains(response, 'name="password"')
 

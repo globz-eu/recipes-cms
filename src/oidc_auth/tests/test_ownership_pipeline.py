@@ -1,10 +1,10 @@
 from unittest import skipUnless
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, connection, transaction
 from django.test import TestCase
-from social_core.exceptions import AuthAlreadyAssociated
+from social_core.exceptions import AuthAssociationError
 from social_django.utils import load_strategy
 
 from oidc_auth.backends import ZitadelOpenIdConnect
@@ -64,7 +64,7 @@ class EnforceEmailOwnershipTestCase(TestCase):
         with self.assertRaises(EmailMissing) as ctx:
             self.enforce(email="")
 
-        self.assertEqual(ctx.exception.code, "email_missing")
+        self.assertEqual(ctx.exception.auth_error, "email_missing")
 
     def test_signed_in_user_with_unverified_email_gets_already_signed_in(self):
         user = User.objects.create_user(username="local", email="me@example.com")
@@ -132,7 +132,7 @@ class EnforceEmailOwnershipTestCase(TestCase):
         with self.assertRaises(AlreadySignedIn) as ctx:
             self.enforce(user=user, social=None)
 
-        self.assertEqual(ctx.exception.code, "already_signed_in")
+        self.assertEqual(ctx.exception.auth_error, "already_signed_in")
         self.assertEqual(
             str(ctx.exception),
             "You are already signed in. Sign out first to use a different "
@@ -145,7 +145,7 @@ class EnforceEmailOwnershipTestCase(TestCase):
         with self.assertRaises(EmailOwnedElsewhere) as ctx:
             self.enforce()
 
-        self.assertEqual(ctx.exception.code, "email_in_use")
+        self.assertEqual(ctx.exception.auth_error, "email_in_use")
         self.assertEqual(str(ctx.exception), EmailOwnedElsewhere.message)
 
 
@@ -218,5 +218,17 @@ class CreateUserTestCase(TestCase):
     def test_other_integrity_errors_are_not_reported_as_email_in_use(self):
         User.objects.create_user(username="taken", email="other@example.com")
 
-        with self.assertRaises(AuthAlreadyAssociated):
+        with self.assertRaises(AuthAssociationError) as raised:
             self.create("taken", EMAIL)
+
+        self.assertEqual(raised.exception.code, "username_in_use")
+
+    def test_integrity_error_without_email_owner_is_a_login_failure(self):
+        with (
+            patch("oidc_auth.pipeline.social_create_user", side_effect=IntegrityError),
+            self.assertRaises(AuthAssociationError) as raised,
+        ):
+            self.create("someone", EMAIL)
+
+        self.assertEqual(raised.exception.code, "unknown_error")
+        self.assertIsInstance(raised.exception.__cause__, IntegrityError)

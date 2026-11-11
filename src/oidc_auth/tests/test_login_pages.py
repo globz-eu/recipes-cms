@@ -11,25 +11,35 @@ class WagtailLoginPageTests(TestCase):
     @override_settings(AUTH_PROVIDERS=["local", "auth0", "zitadel"])
     def test_button_per_social_provider_and_password_form(self):
         response = self.get()
-        self.assertContains(response, 'href="/login/auth0_openidconnect/"')
+        self.assertContains(response, 'action="/login/auth0_openidconnect/"')
+        self.assertContains(response, 'method="post"', count=3)
+        self.assertContains(response, 'name="csrfmiddlewaretoken"', count=3)
         self.assertContains(response, "Sign in with Auth0")
-        self.assertContains(response, 'href="/login/zitadel/"')
+        self.assertContains(response, 'action="/login/zitadel/"')
         self.assertContains(response, "Sign in with Zitadel")
         self.assertContains(response, PASSWORD_MARKER)
 
     @override_settings(AUTH_PROVIDERS=["zitadel"])
     def test_no_password_form_without_local(self):
         response = self.get()
-        self.assertContains(response, 'href="/login/zitadel/"')
+        self.assertContains(response, 'action="/login/zitadel/"')
         self.assertNotContains(response, "auth0_openidconnect")
         self.assertNotContains(response, PASSWORD_MARKER)
 
     @override_settings(AUTH_PROVIDERS=["local", "auth0"])
     def test_next_is_forwarded(self):
         response = self.get(next="/admin/pages/")
+        self.assertContains(response, 'action="/login/auth0_openidconnect/"')
         self.assertContains(
-            response, 'href="/login/auth0_openidconnect/?next=%2Fadmin%2Fpages%2F"'
+            response, '<input type="hidden" name="next" value="/admin/pages/">'
         )
+
+    @override_settings(AUTH_PROVIDERS=["local", "auth0"])
+    def test_no_next_input_without_next(self):
+        response = self.get()
+        self.assertContains(response, 'action="/login/auth0_openidconnect/"')
+        social_form = response.content.decode().split("</form>")[0]
+        self.assertNotIn('name="next"', social_form)
 
     @override_settings(AUTH_PROVIDERS=["local"])
     def test_local_only_has_no_provider_buttons(self):
@@ -45,14 +55,24 @@ class RestFrameworkLoginPageTests(TestCase):
     @override_settings(AUTH_PROVIDERS=["local", "auth0", "zitadel"])
     def test_buttons_and_password_form(self):
         response = self.get(next="/api/")
+        self.assertContains(response, 'action="/login/auth0_openidconnect/"')
+        self.assertContains(response, 'action="/login/zitadel/"')
+        self.assertContains(response, 'method="post"', count=3)
+        self.assertContains(response, 'name="csrfmiddlewaretoken"', count=3)
         self.assertContains(
-            response, 'href="/login/auth0_openidconnect/?next=%2Fapi%2F"'
+            response, '<input type="hidden" name="next" value="/api/" />', count=3
         )
-        self.assertContains(response, 'href="/login/zitadel/?next=%2Fapi%2F"')
         self.assertContains(response, PASSWORD_MARKER)
 
     @override_settings(AUTH_PROVIDERS=["auth0"])
     def test_no_password_form_without_local(self):
         response = self.get(next="/api/")
-        self.assertContains(response, "/login/auth0_openidconnect/")
+        self.assertContains(response, 'action="/login/auth0_openidconnect/"')
         self.assertNotContains(response, PASSWORD_MARKER)
+
+    @override_settings(AUTH_PROVIDERS=["local", "auth0"])
+    def test_no_next_input_on_social_form_without_next(self):
+        response = self.get()
+        self.assertContains(response, 'action="/login/auth0_openidconnect/"')
+        social_form = response.content.decode().split("</form>")[0]
+        self.assertNotIn('name="next"', social_form)

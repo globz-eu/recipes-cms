@@ -10,11 +10,14 @@
           <div>
             <h3 style="margin: 0 0 20px;">Django REST framework</h3>
             {% for p in social_auth_providers %}
-            <a href="{% url 'social:begin' p.backend_name %}?next={{ next|urlencode:"" }}"
-               class="btn btn-primary form-control"
-               style="display: block; margin-bottom: 10px;">
-              Sign in with {{ p.label }}
-            </a>
+            <form method="post" action="{% url 'social:begin' p.backend_name %}">
+              {% csrf_token %}
+              {% if next %}<input type="hidden" name="next" value="{{ next }}" />{% endif %}
+              <button type="submit" class="btn btn-primary form-control"
+                      style="display: block; margin-bottom: 10px;">
+                Sign in with {{ p.label }}
+              </button>
+            </form>
             {% endfor %}
             {% if local_login_enabled and social_auth_providers %}<hr style="margin: 15px 0;" />{% endif %}
           </div>

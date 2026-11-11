@@ -298,7 +298,7 @@ class EnforceZitadelOrgTestCase(SimpleTestCase):
         with self.assertRaises(OrgMismatch) as caught:
             self.enforce()
 
-        self.assertEqual(caught.exception.code, "org_mismatch")
+        self.assertEqual(caught.exception.auth_error, "org_mismatch")
 
     @override_settings(ZITADEL_ROLE_ORG_ID="")
     def test_blank_configured_org_never_admits_a_missing_claim(self):
