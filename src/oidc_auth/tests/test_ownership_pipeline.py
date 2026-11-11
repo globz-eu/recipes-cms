@@ -1,5 +1,5 @@
 from unittest import skipUnless
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, connection, transaction
@@ -222,3 +222,13 @@ class CreateUserTestCase(TestCase):
             self.create("taken", EMAIL)
 
         self.assertEqual(raised.exception.code, "username_in_use")
+
+    def test_integrity_error_without_email_owner_is_a_login_failure(self):
+        with (
+            patch("oidc_auth.pipeline.social_create_user", side_effect=IntegrityError),
+            self.assertRaises(AuthAssociationError) as raised,
+        ):
+            self.create("someone", EMAIL)
+
+        self.assertEqual(raised.exception.code, "unknown_error")
+        self.assertIsInstance(raised.exception.__cause__, IntegrityError)

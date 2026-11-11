@@ -10,6 +10,7 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured
 from django.db import IntegrityError
 from social_core.backends.base import BaseAuth
+from social_core.exceptions import AuthAssociationError
 from social_core.pipeline.user import create_user as social_create_user
 from social_core.strategy import BaseStrategy
 
@@ -108,12 +109,12 @@ def create_user(
     **kwargs: Any,
 ) -> dict[str, Any] | None:
     """
-    social_core's ``create_user``; losing a race for the email is ``email_in_use``.
+    social_core's ``create_user``; a lost email race is ``email_in_use``.
 
-    ``enforce_email_ownership`` checks before the insert; two simultaneous first
-    logins with the same email can both pass it. The unique index on the email
-    (migration ``oidc_auth.0001``) then rejects the second insert. social_django
-    does not recognise that index and lets the ``IntegrityError`` through.
+    The unique email index (``oidc_auth.0001``) can reject a racing insert that
+    ``enforce_email_ownership`` let through. An ``IntegrityError`` with no email
+    owner gets code ``unknown_error`` rather than the default ``identity_in_use``,
+    which the middleware reports as ``already_signed_in``.
     """
     try:
         return social_create_user(
@@ -127,7 +128,9 @@ def create_user(
     except IntegrityError as error:
         if email_owner(details.get("email") or "") is not None:
             raise EmailOwnedElsewhere(backend) from error
-        raise
+        raise AuthAssociationError(
+            backend, code="unknown_error", stage="pipeline"
+        ) from error
 
 
 def sync_roles(

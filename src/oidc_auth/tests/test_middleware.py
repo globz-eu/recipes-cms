@@ -165,7 +165,11 @@ class LoginRefusedMiddlewareTestCase(TestCase):
         self.assertIs(logs.records[0].exc_info[1], exception)
 
     def test_other_association_conflicts_map_to_login_failed(self):
-        for code in ("identifier_migration_conflict", "username_in_use"):
+        for code in (
+            "identifier_migration_conflict",
+            "username_in_use",
+            "unknown_error",
+        ):
             with self.subTest(code=code):
                 request, response = self.handle(AuthAssociationError(Mock(), code=code))
 
