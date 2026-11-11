@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,6 +38,12 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: rg.nl-ams.scw.cloud/namespace-relaxed-faraday/recipes-cms:${{ steps.tag.outputs.version }}
+
+      # recipes-infrastructure's e2e runs pick the latest GitHub release, not the newest tag.
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$GITHUB_REF_NAME" --generate-notes
 
       - name: Trigger e2e tests in recipes-infrastructure
         env:
