@@ -6,7 +6,7 @@ from social_django.models import UserSocialAuth
 
 from oidc_auth.backends import Auth0OpenIdConnect, ZitadelOpenIdConnect
 from oidc_auth.config import AUTH0, SOCIAL_BACKENDS
-from oidc_auth.tests.login_harness import NEXT, complete_login
+from oidc_auth.tests.login_harness import NEXT, auth0_logout_location, complete_login
 
 User = get_user_model()
 
@@ -58,10 +58,13 @@ class LegacyAssociationAssertions(TestCase):
         self.assertEqual(User.objects.count(), 1)
         self.assertEqual(UserSocialAuth.objects.count(), 1)
 
+    def refused_location(self, auth_error):
+        return f"{NEXT}?auth_error={auth_error}"
+
     def assert_refused(self, response, auth_error):
         self.assertRedirects(
             response,
-            f"{NEXT}?auth_error={auth_error}",
+            self.refused_location(auth_error),
             fetch_redirect_response=False,
         )
         self.assertNotIn("_auth_user_id", self.client.session)
@@ -139,6 +142,11 @@ class ZitadelLegacyAssociationTests(LegacyAssociationAssertions):
     AUTH0_ROLES_CLAIM="https://recipes.example.com/roles",
 )
 class Auth0LegacyAssociationTests(LegacyAssociationAssertions):
+    def refused_location(self, auth_error):
+        return auth0_logout_location(
+            "auth0.example.com", f"http://testserver{NEXT}?auth_error={auth_error}"
+        )
+
     def complete(self, uid):
         claims = {"sub": uid, "email": EMAIL, "email_verified": True}
         return complete_login(self.client, Auth0OpenIdConnect, claims)
