@@ -121,3 +121,15 @@ jobs:
           -t "$IMAGE:$GITHUB_REF_NAME"
           "$IMAGE@$AMD64_DIGEST"
           "$IMAGE@$ARM64_DIGEST"
+
+  # A failed arm64 or multi-arch job leaves vX.Y.Z amd64-only; say so on the run.
+  amd64-only-warning:
+    needs: [amd64, arm64, multi-arch]
+    if: ${{ always() && needs.amd64.result == 'success' && needs.multi-arch.result != 'success' }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Report the amd64-only tag
+        run: >-
+          echo "::error::$GITHUB_REF_NAME is amd64-only.
+          Use \"Re-run failed jobs\" on this run to build arm64 and the multi-arch index."
