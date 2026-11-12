@@ -177,3 +177,42 @@ class Auth0RefusalLogoutTestCase(TestCase):
 
         self.assertEqual(response["Location"], reverse("wagtailadmin_login"))
         self.assertEqual(self.stored_messages(request), [EmailNotVerified.message])
+
+    def test_return_to_host_is_always_the_request_or_an_allowed_host(self):
+        for next_url in (
+            "//evil.example.com/frontend/",
+            "https://evil.example.com@app.example.com.evil.com/frontend/",
+            "http://app.example.com:8000/frontend/",
+            "javascript:alert(1)//frontend/",
+            "/\\evil.example.com/frontend/",
+        ):
+            with self.subTest(next_url=next_url):
+                request, response = self.handle(self.auth0_refusal(), next_url)
+
+                self.assertEqual(self.return_to(response), ADMIN_HOME)
+                self.assertEqual(
+                    self.stored_messages(request), [EmailNotVerified.message]
+                )
+
+    def test_paths_other_than_the_frontend_root_return_to_the_admin(self):
+        for next_url in ("/frontend", "/frontend/other/", "/frontend/../admin/"):
+            with self.subTest(next_url=next_url):
+                _, response = self.handle(self.auth0_refusal(), next_url)
+
+                self.assertEqual(self.return_to(response), ADMIN_HOME)
+
+    def test_frontend_hash_is_kept_after_auth_error(self):
+        _, response = self.handle(self.auth0_refusal(), next_url="/frontend/#/login")
+
+        self.assertEqual(
+            self.return_to(response),
+            "http://testserver/frontend/?auth_error=email_unverified#/login",
+        )
+
+    def test_secure_request_rejects_an_http_frontend_target(self):
+        request = self.make_request("http://app.example.com/frontend/")
+        request.META.update({"wsgi.url_scheme": "https", "SERVER_PORT": "443"})
+
+        _, response = self.handle(self.auth0_refusal(), request=request)
+
+        self.assertEqual(self.return_to(response), "https://testserver/admin/")
