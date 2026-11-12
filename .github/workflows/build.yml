@@ -43,7 +43,7 @@ jobs:
           push: true
           tags: ${{ env.IMAGE }}:${{ steps.tag.outputs.version }}
           cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache-amd64
-          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache-amd64,mode=max,image-manifest=true,oci-mediatypes=true
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache-amd64,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true
 
       # recipes-infrastructure's e2e runs pick the latest GitHub release, not the newest tag.
       - name: Create GitHub release
@@ -93,7 +93,7 @@ jobs:
           platforms: linux/arm64
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache-arm64
-          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache-arm64,mode=max,image-manifest=true,oci-mediatypes=true
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache-arm64,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true
 
   # Built from both jobs' digests, not the tag's current value, so re-runs are safe.
   multi-arch:
