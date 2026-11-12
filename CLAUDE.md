@@ -29,8 +29,8 @@ uv run invoke bump --part minor     # bump version, commit, tag vX.Y.Z (tag push
 (cd src && uv run manage.py test recipes.tests.test_bulk_upload.SomeTest.test_name)
 
 # Management commands in the running stack (DEV_STACK as above)
-$DEV_STACK compose exec wagtail uv run manage.py migrate
-$DEV_STACK compose exec wagtail uv run manage.py import_recipes recipes.json
+$DEV_STACK compose exec wagtail python manage.py migrate
+$DEV_STACK compose exec wagtail python manage.py import_recipes recipes.json
 ```
 
 `manage.py` lives in `src/`. Settings are `recipe_cms.settings.{dev,production}` (both extend `base`); the dev settings are baked in via a Docker build arg.
