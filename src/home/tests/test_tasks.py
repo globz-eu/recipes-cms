@@ -7,9 +7,14 @@ from pathlib import Path
 from unittest import SkipTest, mock
 
 from django.test import SimpleTestCase
-from invoke.context import Context
-from invoke.exceptions import Exit
-from invoke.runners import Result
+
+try:
+    from invoke.context import Context
+    from invoke.exceptions import Exit
+    from invoke.runners import Result
+except ImportError:
+    # The image has no dev group; these are host-side checks.
+    raise SkipTest("invoke is not installed (running inside the image)") from None
 
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
