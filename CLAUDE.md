@@ -60,6 +60,8 @@ Wagtail i18n is enabled with `en` (default), `de`, `fr`, `nl`. Each locale has i
 
 Staging runs on Scaleway, managed by the sibling `recipes-infrastructure` Pulumi project; production-only env vars (`ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `CORS_ALLOWED_ORIGINS`, `STATIC_BUCKET_NAME`, …) are documented in README.md. Images are built by GitHub Actions on `vX.Y.Z` tags (`build.yml`), which then creates the GitHub release that recipes-infrastructure's e2e runs look up and dispatches them. The `HealthCheckMiddleware` answers `{BASE_PATH}health` before any other middleware.
 
+- Image layout (`Dockerfile`): the runtime image has no `uv`, compilers or apt packages. The dependency venv is `/opt/venv`, on `PATH`, so commands run as `python manage.py ...`; the app runs from `/app` as the non-root `wagtail` user.
+
 ## Conventions
 
 - Code rules are in `.claude/rules/code-quality.md` (clean, typed, Pythonic code) and `.claude/rules/backend.md` (Django/Wagtail).
