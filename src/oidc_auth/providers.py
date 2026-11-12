@@ -60,9 +60,8 @@ def read_zitadel_roles(backend: BaseAuth, response: dict[str, Any]) -> set[str]:
     }
 
 
-def auth0_logout_url(
-    request: HttpRequest, social: UserSocialAuth, return_to: str
-) -> str:
+def auth0_logout_endpoint(return_to: str) -> str:
+    """Auth0 ``/v2/logout`` URL that returns to ``return_to``; needs no session."""
     params = {
         "client_id": settings.SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY,
         "returnTo": return_to,
@@ -76,6 +75,12 @@ def auth0_logout_url(
             "",
         )
     )
+
+
+def auth0_logout_url(
+    request: HttpRequest, social: UserSocialAuth, return_to: str
+) -> str:
+    return auth0_logout_endpoint(return_to)
 
 
 def zitadel_logout_url(
