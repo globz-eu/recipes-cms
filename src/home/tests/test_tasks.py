@@ -190,7 +190,7 @@ class DevStackCommandsTestCase(SimpleTestCase):
         self.assertIn(
             "-e DJANGO_SETTINGS_MODULE=recipe_cms.settings.test wagtail", command
         )
-        self.assertIn("uv run manage.py test recipes --verbosity=2", command)
+        self.assertIn("python manage.py test recipes --verbosity=2", command)
         self.context.cd.assert_called_once_with(str(tasks.HERE))
 
     def test_test_default_runs_on_the_host_in_src(self):

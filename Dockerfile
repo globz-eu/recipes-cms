@@ -1,44 +1,44 @@
 # syntax=docker/dockerfile:1
 
-FROM debian:trixie-slim
+FROM python:3.14-slim-trixie AS build
 
-ENV PYTHONUNBUFFERED=1
-ENV PORT=8000
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1
 ARG DJANGO_SETTINGS_MODULE="recipe_cms.settings.production"
-ARG TARGETARCH
-ARG ARCH=${TARGETARCH:-amd64}
 ENV DJANGO_SETTINGS_MODULE=$DJANGO_SETTINGS_MODULE
 
-RUN apt-get update --yes --quiet && apt-get install --yes --quiet --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    libjpeg62-turbo-dev \
-    zlib1g-dev \
-    libwebp-dev \
-    ffmpeg \
-    curl \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY --from=ghcr.io/astral-sh/uv:0.9.24 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.9.24 /uv /usr/local/bin/uv
 
 WORKDIR /app
-RUN useradd -m wagtail
-RUN mkdir -p /app/media/images /app/media/original_images
-RUN chown -R wagtail:wagtail /app
-USER wagtail
-COPY --chown=wagtail:wagtail ./src .
-COPY --chown=wagtail:wagtail pyproject.toml .
-COPY --chown=wagtail:wagtail uv.lock .
-COPY --chown=wagtail:wagtail .python-version .
+COPY pyproject.toml uv.lock .python-version ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-install-project
 
-RUN mkdir recipe_cms/static
-RUN uv sync --locked --compile-bytecode
+COPY src .
 # Build has no provider env vars, so enable only the one that needs none.
-RUN AUTH_PROVIDERS=local uv run manage.py collectstatic --noinput --clear
+RUN AUTH_PROVIDERS=local /opt/venv/bin/python manage.py collectstatic --noinput --clear
 
-HEALTHCHECK --interval=30s --timeout=30s --start-interval=5s --start-period=10s --retries=3 CMD ["curl", "--head", "--fail", "http://localhost:8000/health"]
+FROM python:3.14-slim-trixie
 
-CMD ["uv", "run", "gunicorn", "recipe_cms.wsgi:application"]
+ENV PYTHONUNBUFFERED=1 \
+    PORT=8000 \
+    PATH=/opt/venv/bin:$PATH
+ARG DJANGO_SETTINGS_MODULE="recipe_cms.settings.production"
+ENV DJANGO_SETTINGS_MODULE=$DJANGO_SETTINGS_MODULE
+
+WORKDIR /app
+RUN useradd -m wagtail \
+    && mkdir -p /app/media/images /app/media/original_images \
+    && chown -R wagtail:wagtail /app
+COPY --from=build /opt/venv /opt/venv
+COPY --from=build --chown=wagtail:wagtail /app/static /app/static
+COPY --chown=wagtail:wagtail src .
+USER wagtail
+
+HEALTHCHECK --interval=30s --timeout=30s --start-interval=5s --start-period=10s --retries=3 CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+
+CMD ["gunicorn", "recipe_cms.wsgi:application"]
 
 EXPOSE 8000
