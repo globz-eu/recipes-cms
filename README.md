@@ -427,6 +427,14 @@ given at login start (only allowed hosts: the request host and
 can show a message; without a safe `next` URL the user lands on the Wagtail login page
 with an error message.
 
+A failed Auth0 login (any of the above) also ends the Auth0 session: the redirect goes
+through Auth0's `/v2/logout`, so the next attempt shows Auth0's login page instead of
+being refused again straight away. Auth0 only returns to registered paths, so the
+`returnTo` is the safe `next` URL with `auth_error=<code>` when its path is `/frontend/`,
+and otherwise the CMS's `/admin/` with the message shown there. Zitadel refusals redirect
+as described above, without a provider logout. An unverified Auth0 user is asked to verify
+their email; an administrator can resend the verification email from the Auth0 dashboard.
+
 Rollout note: existing users sign in through a provider that must send `email_verified: true`.
 Auth0 and Zitadel do when the `email` scope is requested (Zitadel additionally needs
 "User Info inside ID Token", see below); a provider that does not send it locks everybody out.

@@ -16,7 +16,7 @@ from social_django.models import UserSocialAuth
 from oidc_auth.backends import ZitadelOpenIdConnect
 from oidc_auth.config import AUTH0, SOCIAL_BACKENDS
 from oidc_auth.exceptions import OrgMismatch
-from oidc_auth.tests.login_harness import NEXT, complete_login
+from oidc_auth.tests.login_harness import NEXT, auth0_logout_location, complete_login
 
 User = get_user_model()
 
@@ -373,3 +373,32 @@ class LoginFlowTestCase(TestCase):
             pipeline.index(step),
             pipeline.index("social_core.pipeline.social_auth.social_details") + 1,
         )
+
+
+@override_settings(
+    AUTHENTICATION_BACKENDS=[
+        SOCIAL_BACKENDS[AUTH0],
+        "django.contrib.auth.backends.ModelBackend",
+    ],
+    AUTH_PROVIDERS=["local", "auth0"],
+    SOCIAL_AUTH_AUTH0_OPENIDCONNECT_DOMAIN=AUTH0_DOMAIN,
+    SOCIAL_AUTH_AUTH0_OPENIDCONNECT_KEY="key",
+    SOCIAL_AUTH_AUTH0_OPENIDCONNECT_SECRET="secret",
+    AUTH0_ROLES_CLAIM="https://recipes.example.com/roles",
+)
+class Auth0RefusedLoginTests(TestCase):
+    def test_unverified_email_ends_at_the_auth0_logout(self):
+        claims = {"sub": "uid-1", "email": EMAIL, "email_verified": False}
+
+        response = complete_login(
+            self.client, import_string(SOCIAL_BACKENDS[AUTH0]), claims
+        )
+
+        self.assertRedirects(
+            response,
+            auth0_logout_location(
+                AUTH0_DOMAIN, f"http://testserver{NEXT}?auth_error=email_unverified"
+            ),
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(User.objects.exists())

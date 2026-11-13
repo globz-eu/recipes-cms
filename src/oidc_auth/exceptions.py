@@ -20,7 +20,10 @@ class EmailMissing(LoginRefused):
 
 class EmailNotVerified(LoginRefused):
     auth_error = "email_unverified"
-    message = "Your email address is not verified with this sign-in provider."
+    message = (
+        "Please verify your email address with your provider. "
+        "If you didn't get a verification email, ask an administrator to resend it."
+    )
 
 
 class EmailOwnedElsewhere(LoginRefused):
