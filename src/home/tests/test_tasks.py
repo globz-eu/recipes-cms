@@ -7,9 +7,14 @@ from pathlib import Path
 from unittest import SkipTest, mock
 
 from django.test import SimpleTestCase
-from invoke.context import Context
-from invoke.exceptions import Exit
-from invoke.runners import Result
+
+try:
+    from invoke.context import Context
+    from invoke.exceptions import Exit
+    from invoke.runners import Result
+except ImportError:
+    # The image has no dev group; these are host-side checks.
+    raise SkipTest("invoke is not installed (running inside the image)") from None
 
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "src"
@@ -185,7 +190,7 @@ class DevStackCommandsTestCase(SimpleTestCase):
         self.assertIn(
             "-e DJANGO_SETTINGS_MODULE=recipe_cms.settings.test wagtail", command
         )
-        self.assertIn("uv run manage.py test recipes --verbosity=2", command)
+        self.assertIn("python manage.py test recipes --verbosity=2", command)
         self.context.cd.assert_called_once_with(str(tasks.HERE))
 
     def test_test_default_runs_on_the_host_in_src(self):

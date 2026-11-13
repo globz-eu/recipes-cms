@@ -124,7 +124,7 @@ def test(
             c,
             f"compose -f {COMPOSE_DEV} run --build --rm"
             " -e DJANGO_SETTINGS_MODULE=recipe_cms.settings.test wagtail"
-            f" uv run manage.py test {label} --verbosity={verbosity}",
+            f" python manage.py test {label} --verbosity={verbosity}",
             pty=sys.stdout.isatty(),
         )
         return

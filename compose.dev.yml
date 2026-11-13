@@ -20,7 +20,7 @@ services:
       - sh
       - -c
       - >-
-        uv run manage.py migrate --noinput &&
-        uv run manage.py ensure_users &&
-        uv run manage.py collectstatic --noinput --clear &&
-        exec uv run manage.py runserver 0.0.0.0:8000
+        python manage.py migrate --noinput &&
+        python manage.py ensure_users &&
+        python manage.py collectstatic --noinput --clear &&
+        exec python manage.py runserver 0.0.0.0:8000

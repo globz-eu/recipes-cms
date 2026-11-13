@@ -148,7 +148,7 @@ Each entry groups the language versions of one recipe (max. 500 entries; a top-l
 The same file can be imported from the command line (no permission checks; pages are published as requested; `DEV_STACK` is defined in "Running Management Commands"):
 
 ```bash
-$DEV_STACK compose exec wagtail uv run manage.py import_recipes recipes.json
+$DEV_STACK compose exec wagtail python manage.py import_recipes recipes.json
 ```
 
 ## Development
@@ -213,9 +213,9 @@ DEV_STACK="${RECIPES_INFRA_DIR:-<main checkout>/../recipes-infrastructure}"/scri
 $DEV_STACK compose exec wagtail /bin/bash
 
 # Or run a command directly
-$DEV_STACK compose exec wagtail uv run manage.py migrate
-$DEV_STACK compose exec wagtail uv run manage.py createsuperuser
-$DEV_STACK compose exec wagtail uv run manage.py collectstatic
+$DEV_STACK compose exec wagtail python manage.py migrate
+$DEV_STACK compose exec wagtail python manage.py createsuperuser
+$DEV_STACK compose exec wagtail python manage.py collectstatic
 ```
 
 #### Create or update an admin user
@@ -229,7 +229,7 @@ shell history:
 
 ```bash
 $DEV_STACK compose exec -e DJANGO_ADMIN_PASSWORD='…' wagtail \
-  uv run manage.py ensure_admin --username admin --email admin@example.com
+  python manage.py ensure_admin --username admin --email admin@example.com
 ```
 
 `--username` and `--email` default to `DJANGO_ADMIN_USERNAME` and `DJANGO_ADMIN_EMAIL`. The
@@ -353,7 +353,7 @@ $DEV_STACK compose exec -T s3 /garage key delete --yes <old key id>
 If documents were uploaded before `wagtail-storages` was active, run:
 
 ```bash
-$DEV_STACK compose exec wagtail uv run manage.py fix_document_acls
+$DEV_STACK compose exec wagtail python manage.py fix_document_acls
 ```
 
 ## Deployment
@@ -449,7 +449,7 @@ abort when the configured username belongs to a social user. Find duplicates
 (case-insensitive) with:
 
 ```bash
-$DEV_STACK compose exec wagtail uv run manage.py shell -c "from django.contrib.auth import get_user_model; from django.db.models import Count; from django.db.models.functions import Lower; print(list(get_user_model().objects.annotate(e=Lower('email')).exclude(e='').values('e').annotate(n=Count('id')).filter(n__gt=1)))"
+$DEV_STACK compose exec wagtail python manage.py shell -c "from django.contrib.auth import get_user_model; from django.db.models import Count; from django.db.models.functions import Lower; print(list(get_user_model().objects.annotate(e=Lower('email')).exclude(e='').values('e').annotate(n=Count('id')).filter(n__gt=1)))"
 ```
 
 It must print `[]`. Otherwise change the email of, or delete, all but one account per address in
