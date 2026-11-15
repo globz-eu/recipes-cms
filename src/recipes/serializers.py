@@ -22,7 +22,7 @@ class PayloadTooLarge(APIException):
 
 def _too_large(field: str) -> PayloadTooLarge:
     return PayloadTooLarge(
-        {field: [f"File too large; the maximum is {MAX_UPLOAD_SIZE} bytes."]}
+        {field: [f"Upload too large; the maximum is {MAX_UPLOAD_SIZE} bytes."]}
     )
 
 

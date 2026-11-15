@@ -329,7 +329,7 @@ class BulkUploadTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
         self.assertEqual(
             response.json(),
-            {"body": [f"File too large; the maximum is {MAX_UPLOAD_SIZE} bytes."]},
+            {"body": [f"Upload too large; the maximum is {MAX_UPLOAD_SIZE} bytes."]},
         )
 
     def test_file_that_is_not_utf8(self):
