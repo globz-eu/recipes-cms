@@ -108,7 +108,7 @@ src/
 
 ### Bulk recipe upload
 
-`POST /api/recipes/bulk-upload/` accepts either a JSON file in the multipart field `file` (max. 5 MB) or the same JSON as the request body. It requires a session of an Editors/Moderators (mapped roles), staff or superuser user and the `X-CSRFToken` header.
+`POST /api/recipes/bulk-upload/` accepts either a JSON file in the multipart field `file` or the same JSON as the request body. Both are limited to 5 MiB (5242880 bytes); larger ones get `413` with the message under `file` (multipart) or `body` (JSON body). A body of exactly 5 MiB is accepted. It requires a session of an Editors/Moderators (mapped roles), staff or superuser user and the `X-CSRFToken` header.
 
 ```bash
 curl -b cookies.txt -H "X-CSRFToken: $TOKEN" -F file=@recipes.json \
@@ -143,6 +143,7 @@ Each entry groups the language versions of one recipe (max. 500 entries; a top-l
 - Recipes are matched by slug and locale: existing ones are updated (all fields and the ingredient list are replaced), new ones are created. Translations in one entry share a `translation_key`, so they appear as translations of each other in the Wagtail admin.
 - Wagtail page permissions apply: users who may not publish (the default Editors group) get draft revisions for a moderator to publish; `live` in the response shows the result.
 - The upload is all-or-nothing: on any error nothing is written and the response is `400` with errors keyed by entry index and locale.
+- Size limits by layer: the application enforces 5 MiB (above) and Django's request body limit (`DATA_UPLOAD_MAX_MEMORY_SIZE`) is raised to match; nginx allows 50 MB (`client_max_body_size`), so it never rejects first; gunicorn sets no body limit; Scaleway Serverless Containers document no request body limit ([limitations](https://www.scaleway.com/en/docs/serverless-containers/reference-content/containers-limitations/)).
 - The response lists `created` and `updated` pages with `id`, `slug`, `locale`, `translation_key` and `live`.
 
 The same file can be imported from the command line (no permission checks; pages are published as requested; `DEV_STACK` is defined in "Running Management Commands"):
