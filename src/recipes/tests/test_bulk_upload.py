@@ -17,10 +17,18 @@ from wagtail.models import Locale, Page
 from home.models import HomePage
 from recipes import importer
 from recipes.models import RecipeIngredient, RecipePage
+from recipes.serializers import MAX_UPLOAD_SIZE
 
 User = get_user_model()
 
 URL = reverse("recipes-bulk-upload")
+
+
+def json_body_of_size(size: int) -> bytes:
+    """A valid upload body of exactly `size` bytes, padded via `preparation`."""
+    empty = json.dumps(pancakes(en={**EN_PANCAKES, "preparation": ""}))
+    padding = "a" * (size - len(empty))
+    return json.dumps(pancakes(en={**EN_PANCAKES, "preparation": padding})).encode()
 
 
 def pancakes(**translations):
@@ -272,6 +280,34 @@ class BulkUploadTests(APITestCase):
 
         self.assertNothingWritten(response)
         self.assertTrue(response.data["file"][0].startswith("Invalid JSON: "))
+
+    def test_file_of_exactly_the_limit_is_accepted(self):
+        response = self.upload_file(json_body_of_size(MAX_UPLOAD_SIZE))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_file_over_the_limit_is_rejected(self):
+        response = self.upload_file(json_body_of_size(MAX_UPLOAD_SIZE + 1))
+
+        self.assertEqual(response.status_code, status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+        self.assertIn(str(MAX_UPLOAD_SIZE), response.data["file"][0])
+        self.assertFalse(RecipePage.objects.exists())
+
+    def post_raw_body(self, body: bytes):
+        self.client.force_authenticate(user=self.moderator_user)
+        return self.client.post(URL, body, content_type="application/json")
+
+    def test_raw_body_of_exactly_the_limit_is_accepted(self):
+        response = self.post_raw_body(json_body_of_size(MAX_UPLOAD_SIZE))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_raw_body_over_the_limit_is_rejected(self):
+        response = self.post_raw_body(json_body_of_size(MAX_UPLOAD_SIZE + 1))
+
+        self.assertEqual(response.status_code, status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+        self.assertIn(str(MAX_UPLOAD_SIZE), response.data["body"][0])
+        self.assertFalse(RecipePage.objects.exists())
 
     def test_file_that_is_not_utf8(self):
         response = self.upload_file(b"\xff\xfe{}")
