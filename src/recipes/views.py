@@ -15,7 +15,12 @@ from home.permissions import IsEditorOrAdmin
 
 from .importer import RecipeImportError, import_recipes
 from .models import RecipePage
-from .serializers import BulkUploadSerializer, RecipeSerializer, load_json_upload
+from .serializers import (
+    BulkUploadSerializer,
+    RecipeSerializer,
+    check_body_size,
+    load_json_upload,
+)
 
 
 class RecipeViewSet(ReadOnlyModelViewSet):
@@ -64,6 +69,8 @@ class RecipeViewSet(ReadOnlyModelViewSet):
         Creates or updates recipes from a JSON file (multipart field "file")
         or a JSON request body.
         """
+        if (request.content_type or "").startswith("application/json"):
+            check_body_size(request.META.get("CONTENT_LENGTH"))
         upload = request.FILES.get("file")
         payload = load_json_upload(upload) if upload else request.data
         if isinstance(payload, list):

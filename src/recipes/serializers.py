@@ -4,14 +4,26 @@ from collections import Counter
 from django.conf import settings
 from django.core.files.uploadedfile import UploadedFile
 from django.utils.text import slugify
-from rest_framework import serializers
+from rest_framework import serializers, status
+from rest_framework.exceptions import APIException
 from wagtail.admin.rich_text.converters.editor_html import EditorHTMLConverter
 from wagtail.rich_text import expand_db_html
 
 from .models import RecipeIngredient, RecipePage
 
-MAX_UPLOAD_SIZE = 5 * 1024 * 1024
+MAX_UPLOAD_SIZE = settings.DATA_UPLOAD_MAX_MEMORY_SIZE
 MAX_RECIPES_PER_UPLOAD = 500
+
+
+class PayloadTooLarge(APIException):
+    status_code = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+    default_code = "payload_too_large"
+
+
+def _too_large(field: str) -> PayloadTooLarge:
+    return PayloadTooLarge(
+        {field: [f"File too large; the maximum is {MAX_UPLOAD_SIZE} bytes."]}
+    )
 
 
 class RichTextField(serializers.CharField):
@@ -145,9 +157,7 @@ class BulkUploadSerializer(serializers.Serializer):
 def load_json_upload(file: UploadedFile) -> object:
     """Decodes an uploaded JSON file, raising a ValidationError for bad files."""
     if file.size is not None and file.size > MAX_UPLOAD_SIZE:
-        raise serializers.ValidationError(
-            {"file": [f"File too large; the maximum is {MAX_UPLOAD_SIZE} bytes."]}
-        )
+        raise _too_large("file")
     try:
         return json.loads(file.read().decode("utf-8"))
     except UnicodeDecodeError:
@@ -158,3 +168,13 @@ def load_json_upload(file: UploadedFile) -> object:
         raise serializers.ValidationError(
             {"file": [f"Invalid JSON: {error}"]}
         ) from error
+
+
+def check_body_size(content_length: str | None) -> None:
+    """Raises PayloadTooLarge when the declared body size exceeds the limit."""
+    if (
+        content_length
+        and content_length.isdigit()
+        and int(content_length) > MAX_UPLOAD_SIZE
+    ):
+        raise _too_large("body")
