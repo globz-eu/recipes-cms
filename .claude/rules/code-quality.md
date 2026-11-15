@@ -101,6 +101,8 @@ Ruff (`C4`, `SIM`, `UP`, `RET`, `PERF`, `B`, `PIE`, `PTH`, `FURB`) enforces many
 - New features and behaviour changes get tests in `<app>/tests/test_*.py`, using Django's test
   runner (not pytest), mirroring the module under test. Split large test modules by scenario.
 - Tests are behaviour-focused: assert on results, not on internals.
+- Put a test helper next to the tests that use it, not grouped with other helper code (at the top
+  of the module or class, beside unrelated helpers).
 
 ## Before finishing
 
