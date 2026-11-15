@@ -8,7 +8,7 @@ Oversize bulk uploads must fail with the API's own JSON error, not a proxy error
 
 ### Findings (today)
 - Multipart `file`: `load_json_upload` refuses > 5 MiB with 400; no test covers it.
-- Raw JSON body: no limit; DRF streams it, so `DATA_UPLOAD_MAX_MEMORY_SIZE` does not apply.
+- Raw JSON body: DRF reads `request.body`, so Django's `DATA_UPLOAD_MAX_MEMORY_SIZE` (2.5 MiB default) applies; over it, Django's HTML 400.
 - Dev nginx (recipes-infrastructure `dev/config/nginx/nginx.conf.template`): `client_max_body_size 50m` on `location /`.
 - Docker, gunicorn: no body limit.
 - Staging (Scaleway Serverless Container, no nginx): no documented request body limit.
@@ -21,7 +21,6 @@ Oversize bulk uploads must fail with the API's own JSON error, not a proxy error
 
 ### Non-goals
 - No change to nginx, gunicorn or Scaleway config; 50 MB nginx stays as outer safety net.
-- No site-wide `DATA_UPLOAD_MAX_MEMORY_SIZE` change.
 
 ### Approaches
 - **Chosen:** `Content-Length` check in the bulk-upload view; endpoint-local, reads nothing; chunked bodies arrive empty in DRF and fail validation.
@@ -30,6 +29,7 @@ Oversize bulk uploads must fail with the API's own JSON error, not a proxy error
 
 ### Decided
 - 413 for both paths (file path changes from 400); no caller depends on 400 yet.
+- `DATA_UPLOAD_MAX_MEMORY_SIZE` raised to 5 MiB in `base.py`; `MAX_UPLOAD_SIZE` reads it (one source).
 
 ### Left to the builder
 - Error body shape for the raw-body case (stay close to the file error's `{"file": [...]}`).

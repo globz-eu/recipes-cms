@@ -4,9 +4,11 @@ Spec: [bulk-upload-size-limits.spec.md](bulk-upload-size-limits.spec.md)
 
 ## Context
 - `MAX_UPLOAD_SIZE` is enforced only for multipart files (`serializers.py:147`, 400, untested).
-- Raw JSON bodies have no limit; nginx (50m), gunicorn and Scaleway need no change.
+- Raw JSON bodies hit Django's `DATA_UPLOAD_MAX_MEMORY_SIZE` (2.5 MiB default, HTML 400): DRF reads `request.body`.
+- nginx (50m), gunicorn and Scaleway need no change.
 
 ## Design
+- `settings/base.py`: `DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024`; `MAX_UPLOAD_SIZE = settings.DATA_UPLOAD_MAX_MEMORY_SIZE`.
 - Add `PayloadTooLarge(APIException)` in `serializers.py`: `status_code = 413`, `default_code = "payload_too_large"`.
 - Verified: DRF `exception_handler` returns a dict/list `detail` unchanged as the body, with `exc.status_code`.
 - `APIException(detail=dict)` wraps values in `ErrorDetail`; they serialise as plain strings.
@@ -24,10 +26,10 @@ Spec: [bulk-upload-size-limits.spec.md](bulk-upload-size-limits.spec.md)
 4. README states the limit, the 413 and each layer's allowance.
 
 ## Implementation steps
-1. `serializers.py`: add `PayloadTooLarge` and `check_body_size`; raise `PayloadTooLarge` in `load_json_upload`.
+1. `settings/base.py` and `serializers.py`: raise `DATA_UPLOAD_MAX_MEMORY_SIZE`, derive `MAX_UPLOAD_SIZE`; add `PayloadTooLarge` and `check_body_size`; raise `PayloadTooLarge` in `load_json_upload`.
 2. `views.py` (`bulk_upload`): call `check_body_size` for JSON content before reading `request.data`.
 3. `src/recipes/tests/test_bulk_upload.py`: add size tests beside `test_invalid_json_file` (line 270).
-4. `README.md` "Bulk recipe upload" (line 111): 5 MiB, 413, nginx 50 MB, gunicorn none, Scaleway undocumented.
+4. `README.md` "Bulk recipe upload" (line 111): 5 MiB, 413, Django limit raised to match, nginx 50 MB, gunicorn none, Scaleway undocumented.
 5. Run `uv run invoke format`, `lint`, `test`.
 
 ## Test plan
