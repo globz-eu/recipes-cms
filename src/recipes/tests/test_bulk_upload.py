@@ -9,6 +9,7 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import CommandError, call_command
+from django.test import SimpleTestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -17,7 +18,7 @@ from wagtail.models import Locale, Page
 from home.models import HomePage
 from recipes import importer
 from recipes.models import RecipeIngredient, RecipePage
-from recipes.serializers import MAX_UPLOAD_SIZE
+from recipes.serializers import MAX_UPLOAD_SIZE, PayloadTooLarge, check_body_size
 
 User = get_user_model()
 
@@ -309,6 +310,28 @@ class BulkUploadTests(APITestCase):
         self.assertIn(str(MAX_UPLOAD_SIZE), response.data["body"][0])
         self.assertFalse(RecipePage.objects.exists())
 
+    def test_raw_body_between_djangos_old_default_and_the_limit_is_accepted(self):
+        body = json_body_of_size(3 * 1024 * 1024)
+
+        response = self.post_raw_body(body)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_raw_body_over_the_limit_with_charset_suffix_is_rejected(self):
+        self.client.force_authenticate(user=self.moderator_user)
+
+        response = self.client.post(
+            URL,
+            json_body_of_size(MAX_UPLOAD_SIZE + 1),
+            content_type="application/json; charset=utf-8",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+        self.assertEqual(
+            response.json(),
+            {"body": [f"File too large; the maximum is {MAX_UPLOAD_SIZE} bytes."]},
+        )
+
     def test_file_that_is_not_utf8(self):
         response = self.upload_file(b"\xff\xfe{}")
 
@@ -506,3 +529,21 @@ class ImportRecipesCommandTests(APITestCase):
             self.run_command(pancakes(nl=DE_PANCAKES))
 
         self.assertIsInstance(ctx.exception.__cause__, importer.RecipeImportError)
+
+
+class CheckBodySizeTests(SimpleTestCase):
+    def test_limit_and_smaller_pass(self):
+        for length in (str(MAX_UPLOAD_SIZE), "0", "1"):
+            with self.subTest(length=length):
+                check_body_size(length)
+
+    def test_over_the_limit_raises(self):
+        with self.assertRaises(PayloadTooLarge) as caught:
+            check_body_size(str(MAX_UPLOAD_SIZE + 1))
+
+        self.assertEqual(caught.exception.status_code, 413)
+
+    def test_missing_empty_or_non_numeric_length_passes(self):
+        for length in (None, "", "abc", "-5", "1.5"):
+            with self.subTest(length=length):
+                check_body_size(length)
