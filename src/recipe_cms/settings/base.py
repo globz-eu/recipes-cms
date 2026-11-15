@@ -322,6 +322,8 @@ STORAGES: dict[str, dict[str, Any]] = {
 # Django sets a maximum of 1000 fields per form by default, but particularly complex page models
 # can exceed this limit within Wagtail's page editor.
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10_000
+# Also the bulk upload limit (recipes.serializers.MAX_UPLOAD_SIZE)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 
 
 # Wagtail settings
