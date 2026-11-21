@@ -54,4 +54,4 @@ Wagtail i18n with `en` (default), `de`, `fr`, `nl`. Each locale has its own Home
 ## Conventions
 
 - Code rules: `.claude/rules/code-quality.md` (clean, typed, Pythonic) and `.claude/rules/backend.md` (Django/Wagtail).
-- `uv run invoke lint` must pass (ruff + mypy over `src/` and `tasks.py`). Tests live in `<app>/tests/` and use Django's test runner.
+- `uv run invoke lint` must pass (ruff + mypy over `src/` and `tasks.py`).
