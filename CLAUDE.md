@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-The dev stack lives in the sibling repo recipes-infrastructure (`dev/compose.yml`, `scripts/dev-stack.sh`); this repo only adds `compose.dev.yml`, which builds this checkout and syncs `src/` into the `wagtail` container. Set `RECIPES_INFRA_DIR` (shell or `.env`) if it is not a sibling checkout. Python deps are managed with `uv` (Python 3.14+). The stack needs `.env`: `cp ../recipes-infrastructure/dev/.env.example .env && chmod 600 .env`, then fill in the secrets (extra worktrees: `dev-stack.sh env`). The tests do not need it.
+The dev stack lives in the sibling repo recipes-infrastructure (`dev/compose.yml`, `scripts/dev-stack.sh`); this repo only adds `compose.dev.yml`, which builds this checkout and syncs `src/` into the `wagtail` container. Python deps are managed with `uv` (Python 3.14+). The stack needs `.env`: in the main checkout `cp ../recipes-infrastructure/dev/.env.example .env && chmod 600 .env`, then fill in the secrets (extra worktrees: `dev-stack.sh env`). For a fresh stack, see README.md "Provisioning Garage". `RECIPES_INFRA_DIR` in `.env` only helps once `.env` exists, so use the shell for the first setup. The tests do not need `.env`.
 
 Tests run on the host with SQLite by default (no Docker, no `.env`). Changes touching email uniqueness (the `LOWER(email)` index, `oidc_auth` migration 0001, `enforce_email_ownership`, user forms) or other Postgres-specific behaviour must also pass `uv run invoke test --postgres`: CI runs only lint and the SQLite tests, and the index test is skipped on SQLite.
 
@@ -30,7 +30,7 @@ $DEV_STACK compose exec wagtail python manage.py import_recipes recipes.json
 
 Django + Wagtail headless CMS: Wagtail admin for editors, DRF API under `/api/` consumed by `../recipes-frontend`.
 
-- **`oidc_auth`**: pluggable sign-in; `AUTH_PROVIDERS` (`local`, `auth0`, `zitadel`) selects the methods, and settings fail at import if an enabled provider's variables are missing (`config.py`). Invariants: one email, one provider (unique `LOWER(email)` index, `enforce_email_ownership`); the Zitadel org check fails closed (`enforce_zitadel_org`); refusals are `LoginRefused` subclasses (`exceptions.py`), each with an `auth_error` code that `LoginRefusedMiddleware` turns into a redirect. Roles come from `providers.py` via `ROLE_GROUP_MAP`; `admin` grants superuser/staff. Details: `pipeline.py`, `middleware.py`, `redirects.py`; `tests/login_harness.py` is the shared test login helper.
+- **`oidc_auth`**: pluggable sign-in. `AUTH_PROVIDERS` (`local`, `auth0`, `zitadel`; default `local,auth0`) selects the methods; settings fail at import if an enabled provider's variables are missing or blank (`config.py`), and zitadel also needs `ZITADEL_ROLE_ORG_ID`. Social logins start with a POST (CSRF token and `next` as form fields; GET is 405). Invariants: one email, one provider (unique `LOWER(email)` index, `enforce_email_ownership`); the Zitadel org check fails closed (`enforce_zitadel_org`); refusals are `LoginRefused` subclasses (`exceptions.py`), each with an `auth_error` code that `LoginRefusedMiddleware` turns into a redirect. `LocalLoginView` and `safe_redirect_url` follow `next` only to the request host and `ALLOWED_REDIRECT_HOSTS`, and require HTTPS on secure requests. Without `local`, `PermissionsOnlyBackend` replaces `ModelBackend`. Roles: provider readers in `providers.py`, mapped through `ROLE_GROUP_MAP` (`settings/base.py`); `admin` grants superuser/staff. Details: `pipeline.py`, `middleware.py`, `redirects.py`; `tests/login_harness.py` is the shared test login helper.
 - **`home`**: `HomePage` (one per locale) is the only allowed parent of `RecipePage`. `locales.get_requested_locale` implements `?locale=`. Also the `ensure_admin` and `ensure_users` commands, `/api/dev-login/` (404 unless `DEV_PASSWORD_LOGIN`, set only by `settings/dev.py`) and the shared permission class.
 - **`recipes`**: `RecipePage` with orderable `RecipeIngredient` children. Bulk upload: `serializers.py` (validation), `importer.py` (service shared by the API view and `import_recipes`), `views.py`.
 - **`image_auth`**: `serve_media` streams media from S3 to authorized users; nginx proxies `/media/` to it.
@@ -49,7 +49,7 @@ Wagtail i18n with `en` (default), `de`, `fr`, `nl`. Each locale has its own Home
 
 ### Deployment notes
 
-`HealthCheckMiddleware` answers `{BASE_PATH}health` before any other middleware. The runtime image has no `uv`, compilers or apt packages; the venv is `/opt/venv` (on `PATH`), so run `python manage.py ...`; the app runs from `/app` as the non-root `wagtail` user. Production env vars are documented in README.md.
+`HealthCheckMiddleware` answers `{BASE_PATH}health` before any other middleware. The Dockerfile's build-time collectstatic runs with `AUTH_PROVIDERS=local`. The runtime image has no `uv`, compilers or apt packages; the venv is `/opt/venv` (on `PATH`), so run `python manage.py ...`; the app runs from `/app` as the non-root `wagtail` user. Production env vars are documented in README.md.
 
 ## Conventions
 
