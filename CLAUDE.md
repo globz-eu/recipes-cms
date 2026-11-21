@@ -34,7 +34,7 @@ Django + Wagtail headless CMS: Wagtail admin for editors, DRF API under `/api/` 
 - **`home`**: `HomePage` (one per locale) is the only allowed parent of `RecipePage`. `locales.get_requested_locale` implements `?locale=`. Also the `ensure_admin` and `ensure_users` commands, `/api/dev-login/` (404 unless `DEV_PASSWORD_LOGIN`, set only by `settings/dev.py`) and the shared permission class.
 - **`recipes`**: `RecipePage` with orderable `RecipeIngredient` children. Bulk upload: `serializers.py` (validation), `importer.py` (service shared by the API view and `import_recipes`), `views.py`.
 - **`image_auth`**: `serve_media` streams media from S3 to authorized users; nginx proxies `/media/` to it.
-- **nginx** config lives in recipes-infrastructure; dev settings read `DEV_FRONTEND_ORIGINS` (default `http://localhost:5173`) for `CSRF_TRUSTED_ORIGINS` and `ALLOWED_REDIRECT_HOSTS`.
+- **nginx** config lives in recipes-infrastructure; dev settings read `DEV_FRONTEND_ORIGINS` (default `http://localhost:5173`) for `CSRF_TRUSTED_ORIGINS` and `ALLOWED_REDIRECT_HOSTS` (env var in production).
 
 ### Multilingual model
 
