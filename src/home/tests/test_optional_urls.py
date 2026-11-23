@@ -1,7 +1,11 @@
 import importlib
+import os
+import subprocess
+import sys
+from pathlib import Path
 from unittest import mock
 
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import NoReverseMatch, clear_url_caches, reverse
 from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
@@ -66,3 +70,33 @@ class OptionalUrlsTests(TestCase):
             with self.subTest(path=path):
                 response = self.client.get(path, follow=True)
                 self.assertEqual(response.status_code, 200)
+
+
+class BrowsableApiEnvTests(SimpleTestCase):
+    def content_type_for_html_client(self, switch):
+        script = (
+            "import django; django.setup()\n"
+            "from django.test import Client\n"
+            "r = Client().get('/api/', headers={'accept': 'text/html,*/*;q=0.8'})\n"
+            "print(r.status_code, r['Content-Type'])\n"
+        )
+        env = {**os.environ, "ENABLE_BROWSABLE_API": switch}
+        result = subprocess.run(  # noqa: S603 -- fixed interpreter and script
+            [sys.executable, "-c", script],
+            env=env,
+            cwd=Path(__file__).resolve().parents[2],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    def test_env_switch_off_serves_json_without_patching(self):
+        self.assertEqual(
+            self.content_type_for_html_client("false"), "200 application/json"
+        )
+
+    def test_env_switch_on_serves_html(self):
+        self.assertTrue(
+            self.content_type_for_html_client("true").startswith("200 text/html")
+        )
