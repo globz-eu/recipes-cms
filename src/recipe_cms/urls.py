@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
 from rest_framework import urls as rest_framework_urls
@@ -15,7 +16,6 @@ router = DefaultRouter()
 router.register("home", HomeViewSet, basename="home")
 router.register("recipes", RecipeViewSet, basename="recipes")
 urlpatterns = [
-    path("django-admin/", admin.site.urls),
     # Override Wagtail admin login and logout before including wagtailadmin_urls
     path("admin/login/", LocalLoginView.as_view(), name="wagtailadmin_login"),
     path(
@@ -34,16 +34,22 @@ urlpatterns = [
     path("api/", include(router.urls)),
     path("media/<path:image_path>", serve_media, name="serve-media"),
     path("documents/", include(wagtaildocs_urls)),
-    # Override DRF logout to use Auth0-aware logout before including rest_framework urls
-    path(
-        "api-auth/logout/",
-        CustomLogoutView.as_view(redirect_url="/api/"),
-        name="rest_framework_logout",
-    ),
-    path("api-auth/", include(rest_framework_urls, namespace="rest_framework")),
     path("", include("social_django.urls", namespace="social")),
 ]
 
+if settings.ENABLE_DJANGO_ADMIN:
+    urlpatterns.append(path("django-admin/", admin.site.urls))
+
+if settings.ENABLE_BROWSABLE_API:
+    urlpatterns += [
+        # Override DRF logout to use Auth0-aware logout before including rest_framework urls
+        path(
+            "api-auth/logout/",
+            CustomLogoutView.as_view(redirect_url="/api/"),
+            name="rest_framework_logout",
+        ),
+        path("api-auth/", include(rest_framework_urls, namespace="rest_framework")),
+    ]
 
 urlpatterns = urlpatterns + [
     # For anything not caught by a more specific rule above, hand over to
