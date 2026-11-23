@@ -49,7 +49,7 @@ Wagtail i18n with `en` (default), `de`, `fr`, `nl`. Each locale has its own Home
 
 ### Deployment notes
 
-`HealthCheckMiddleware` answers `{BASE_PATH}health` before any other middleware. The Dockerfile's build-time collectstatic runs with `AUTH_PROVIDERS=local`. The runtime image has no `uv`, compilers or apt packages; the venv is `/opt/venv` (on `PATH`), so run `python manage.py ...`; the app runs from `/app` as the non-root `wagtail` user. Production env vars are documented in README.md.
+`HealthCheckMiddleware` answers `{BASE_PATH}health` before any other middleware. The Dockerfile's build-time collectstatic runs with `AUTH_PROVIDERS=local`. The runtime image has no `uv`, compilers or apt packages; the venv is `/opt/venv` (on `PATH`), so run `python manage.py ...`; the app runs from `/app` as the non-root `wagtail` user. Production env vars are documented in README.md. `ENABLE_BROWSABLE_API` and `ENABLE_DJANGO_ADMIN` (`true`/`false`, default on) switch off the browsable API (`settings/base.py`, `REST_FRAMEWORK` renderers and `LOGIN_URL`) and `/django-admin/` (`urls.py`).
 
 ## Conventions
 
