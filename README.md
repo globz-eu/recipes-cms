@@ -389,6 +389,10 @@ extra variables:
 | `AUTH0_ROLES_CLAIM` | Namespaced ID-token claim holding the user's Auth0 roles; required when `auth0` is enabled |
 | `SOCIAL_AUTH_ZITADEL_DOMAIN`, `SOCIAL_AUTH_ZITADEL_KEY`, `SOCIAL_AUTH_ZITADEL_SECRET` | Zitadel instance host (no scheme), client ID and secret; required when `zitadel` is enabled |
 | `ZITADEL_ROLE_ORG_ID` | Id of the Zitadel organisation that owns the project; required when `zitadel` is enabled, and only roles granted in that organisation are trusted (see Zitadel setup) |
+| `ENABLE_BROWSABLE_API` | `true`/`false`, any case (default `true`). `false` serves JSON only, drops the `/api-auth/` URLs and sends login to `/admin/login/` |
+| `ENABLE_DJANGO_ADMIN` | `true`/`false`, any case (default `true`). `false` does not mount `/django-admin/` |
+
+Any other value for these two fails at startup with `ImproperlyConfigured`; an empty value means the default.
 
 The frontend lives in [recipes-frontend](https://github.com/globz-eu/recipes-frontend); compose downloads
 its latest release and serves it at `/frontend/`. Its build is environment-independent: deployments use a

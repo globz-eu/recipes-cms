@@ -16,6 +16,8 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from django.core.exceptions import ImproperlyConfigured
+
 from oidc_auth.config import (
     authentication_backends,
     check_provider_settings,
@@ -30,6 +32,19 @@ def env_list(name: str, default: Iterable[str] = ()) -> list[str]:
     """
     items = [item.strip() for item in os.getenv(name, "").split(",") if item.strip()]
     return items or list(default)
+
+
+def env_flag(name: str, default: bool) -> bool:
+    """Read a ``true``/``false`` environment variable, case-insensitively.
+
+    Returns ``default`` when the variable is unset or blank; any other value raises.
+    """
+    value = os.getenv(name, "").strip().lower()
+    if not value:
+        return default
+    if value not in ("true", "false"):
+        raise ImproperlyConfigured(f"{name} must be 'true' or 'false', got {value!r}")
+    return value == "true"
 
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
@@ -362,7 +377,23 @@ WAGTAILDOCS_EXTENSIONS = [
     "zip",
 ]
 
-LOGIN_URL = "/api-auth/login/"
+ENABLE_BROWSABLE_API = env_flag("ENABLE_BROWSABLE_API", default=True)
+ENABLE_DJANGO_ADMIN = env_flag("ENABLE_DJANGO_ADMIN", default=True)
+
+REST_FRAMEWORK = {
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        *(
+            ["rest_framework.renderers.BrowsableAPIRenderer"]
+            if ENABLE_BROWSABLE_API
+            else []
+        ),
+    ],
+}
+
+LOGIN_URL = (
+    "/api-auth/login/" if ENABLE_BROWSABLE_API else f"/{WAGTAIL_ADMIN_BASE_PATH}/login/"
+)
 LOGIN_REDIRECT_URL = f"/{WAGTAIL_ADMIN_BASE_PATH}/"
 LOGOUT_REDIRECT_URL = os.environ.get("LOGOUT_REDIRECT_URL", "/")
 
